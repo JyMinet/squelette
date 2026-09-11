@@ -1,0 +1,67 @@
+{
+  "$schema": "../../../project_control/schemas/work-item.v1.schema.json",
+  "schema_version": "1.0.0",
+  "work_item_id": "WI-001",
+  "display_reference": "ALPHA-001",
+  "title": "Generic governed change",
+  "objective": "Prove the governed lifecycle without a business domain.",
+  "owner": "Project Owner",
+  "status": "DONE",
+  "human_decision_refs": [
+    "HD-101"
+  ],
+  "conversation_refs": [
+    "CONV-101"
+  ],
+  "agent_run_refs": [
+    "RUN-101"
+  ],
+  "dependencies": [],
+  "base_head": "0123456789abcdef0123456789abcdef01234567",
+  "branch": "work/wi-001-generic-change",
+  "commits": [
+    "89abcdef0123456789abcdef0123456789abcdef"
+  ],
+  "authorized_paths": [
+    "tests/fixtures/project_control"
+  ],
+  "conflict_gate": "INDEPENDENT",
+  "direct_impact": [
+    "tests/fixtures"
+  ],
+  "indirect_impact": [
+    "Project Control validation"
+  ],
+  "authority_impact": [
+    "NONE"
+  ],
+  "concurrent_work_impact": [
+    "NONE"
+  ],
+  "applicability": {
+    "code": "APPLICABLE",
+    "tests": "APPLICABLE",
+    "integration": "APPLICABLE",
+    "deployment": "NOT_APPLICABLE",
+    "runtime_proof": "NOT_APPLICABLE"
+  },
+  "development_status": "DEVELOPED",
+  "test_status": "TESTED",
+  "integration_status": "INTEGRATED",
+  "deployment_status": "NOT_APPLICABLE",
+  "runtime_proof_status": "NOT_APPLICABLE",
+  "evidence": {
+    "tests": [
+      "reports/evidence/WI-001/tests.json"
+    ],
+    "integration": [
+      "reports/evidence/WI-001/integration.json"
+    ],
+    "deployment": [],
+    "runtime_proof": []
+  },
+  "close_condition": "All applicable gates pass and links are reciprocal.",
+  "start_head": "0123456789abcdef0123456789abcdef01234567",
+  "runtime_target": "NOT_APPLICABLE",
+  "close_head": "89abcdef0123456789abcdef0123456789abcdef"
+}

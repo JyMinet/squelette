@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/templates/source-observation.v1.schema.json",
+  "title": "Optional Source Observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["observation_id", "observed_at", "subject", "value", "unit", "source", "validation_status"],
+  "properties": {
+    "observation_id": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "subject": {"type": "string", "minLength": 1},
+    "value": {"type": ["number", "integer", "string", "boolean", "null"]},
+    "unit": {"type": "string", "minLength": 1},
+    "scope": {"type": "object"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "identifier", "authority_level", "acquired_at", "sha256"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "identifier": {"type": "string", "minLength": 1},
+        "authority_level": {"enum": ["OFFICIAL_PRIMARY", "AUTHORIZED", "QUALIFIED_SECONDARY", "UNKNOWN"]},
+        "acquired_at": {"type": "string", "format": "date-time"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "validation_status": {"enum": ["VALID", "REVIEW_REQUIRED", "UNKNOWN", "REJECTED"]},
+    "supersedes": {"type": ["string", "null"]}
+  }
+}

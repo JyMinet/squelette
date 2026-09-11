@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:governed-project:project-control:roadmap-state:v1",
+  "title": "Roadmap State v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "updated_at", "promotion_policy", "work_item_status_values", "integration_state_values", "constraints", "work_items"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "3.0.0"},
+    "updated_at": {"type": "string"},
+    "promotion_policy": {"const": "HUMAN_EXPLICIT"},
+    "work_item_status_values": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "integration_state_values": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["one_canonical_baseline", "one_work_item_one_branch", "max_active_integration_candidates", "short_lived_worktrees"],
+      "properties": {
+        "one_canonical_baseline": {"const": true},
+        "one_work_item_one_branch": {"const": true},
+        "max_active_integration_candidates": {"type": "integer", "minimum": 1},
+        "short_lived_worktrees": {"const": true}
+      }
+    },
+    "work_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["work_item_id", "display_reference", "title", "status", "integration_state", "human_gate", "dependencies"],
+        "properties": {
+          "work_item_id": {"type": "string", "pattern": "^WI-[0-9]{3,}$"},
+          "display_reference": {"type": "string", "minLength": 1},
+          "title": {"type": "string", "minLength": 1},
+          "status": {"type": "string"},
+          "integration_state": {"type": "string"},
+          "human_gate": {"type": "string", "minLength": 1},
+          "dependencies": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^WI-[0-9]{3,}$"}}
+        }
+      }
+    }
+  }
+}

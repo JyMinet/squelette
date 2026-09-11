@@ -1,0 +1,27 @@
+{
+  "$schema": "../../project_control/schemas/roadmap-state.v1.schema.json",
+  "schema_version": "3.0.0",
+  "updated_at": "UNKNOWN",
+  "promotion_policy": "HUMAN_EXPLICIT",
+  "work_item_status_values": [
+    "PROPOSED",
+    "AUTHORIZED",
+    "IN_PROGRESS",
+    "IMPLEMENTED",
+    "INTEGRATED",
+    "DEPLOYED",
+    "RUNTIME_PROVEN",
+    "DONE",
+    "BLOCKED",
+    "REJECTED",
+    "SUPERSEDED"
+  ],
+  "integration_state_values": ["UNMERGED", "ACTIVE_WORK", "INTEGRATED", "HISTORICAL"],
+  "constraints": {
+    "one_canonical_baseline": true,
+    "one_work_item_one_branch": true,
+    "max_active_integration_candidates": 1,
+    "short_lived_worktrees": true
+  },
+  "work_items": []
+}

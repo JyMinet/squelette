@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../project_control/schemas/conversation-reference.v1.schema.json",
+  "schema_version": "1.0.0",
+  "conversation_ref": "CONV-101",
+  "provider": "GenericConversationSystem",
+  "workspace": null,
+  "title": "Project Control authorization",
+  "date": "UNKNOWN",
+  "purpose": "Reference the discussion that authorized the fixture Work Item.",
+  "related_work_items": ["WI-001"],
+  "external_reference": null,
+  "summary_reference": "The full conversation is intentionally not copied into Git."
+}

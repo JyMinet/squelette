@@ -1,0 +1,19 @@
+{
+  "$schema": "schemas/project-state.v1.schema.json",
+  "schema_version": "1.0.0",
+  "repository_role": "PROJECT_TEMPLATE",
+  "project_name": "UNKNOWN",
+  "project_key": null,
+  "project_owner": "UNKNOWN",
+  "legacy_baseline": null,
+  "authorities_baseline": null,
+  "reporting_style": "UNKNOWN",
+  "language": "UNKNOWN",
+  "initialization": {
+    "status": "NOT_STARTED",
+    "completion_human_decision_ref": null,
+    "completed_at": null,
+    "baseline_head": "UNKNOWN",
+    "closeout_evidence": []
+  }
+}

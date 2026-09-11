@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:governed-project:project-control:work-item:v1",
+  "title": "Work Item v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "work_item_id",
+    "display_reference",
+    "title",
+    "objective",
+    "owner",
+    "status",
+    "human_decision_refs",
+    "conversation_refs",
+    "agent_run_refs",
+    "dependencies",
+    "base_head",
+    "branch",
+    "commits",
+    "authorized_paths",
+    "conflict_gate",
+    "direct_impact",
+    "indirect_impact",
+    "authority_impact",
+    "concurrent_work_impact",
+    "applicability",
+    "development_status",
+    "test_status",
+    "integration_status",
+    "deployment_status",
+    "runtime_proof_status",
+    "evidence",
+    "close_condition",
+    "start_head",
+    "runtime_target"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "1.0.0"},
+    "work_item_id": {"type": "string", "pattern": "^WI-[0-9]{3,}$"},
+    "display_reference": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "objective": {"type": "string", "minLength": 1},
+    "owner": {"type": "string", "minLength": 1},
+    "status": {"enum": ["PROPOSED", "AUTHORIZED", "IN_PROGRESS", "IMPLEMENTED", "INTEGRATED", "DEPLOYED", "RUNTIME_PROVEN", "DONE", "BLOCKED", "REJECTED", "SUPERSEDED"]},
+    "human_decision_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^HD-[0-9]{3,}$"}
+    },
+    "conversation_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "agent_run_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "dependencies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^WI-[0-9]{3,}$"}
+    },
+    "base_head": {"type": "string", "pattern": "^(UNKNOWN|[a-f0-9]{40})$"},
+    "branch": {"type": "string", "minLength": 1},
+    "commits": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-f0-9]{40}$"}
+    },
+    "authorized_paths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "conflict_gate": {"enum": ["INDEPENDENT", "DEPENDENT", "OVERLAPPING", "CONFLICTING"]},
+    "direct_impact": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "indirect_impact": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "authority_impact": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "concurrent_work_impact": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "tests", "integration", "deployment", "runtime_proof"],
+      "properties": {
+        "code": {"enum": ["APPLICABLE", "NOT_APPLICABLE", "UNKNOWN"]},
+        "tests": {"enum": ["APPLICABLE", "NOT_APPLICABLE", "UNKNOWN"]},
+        "integration": {"enum": ["APPLICABLE", "NOT_APPLICABLE", "UNKNOWN"]},
+        "deployment": {"enum": ["APPLICABLE", "NOT_APPLICABLE", "UNKNOWN"]},
+        "runtime_proof": {"enum": ["APPLICABLE", "NOT_APPLICABLE", "UNKNOWN"]}
+      }
+    },
+    "development_status": {"enum": ["DEVELOPED", "FAILED", "NOT_REACHED", "NOT_APPLICABLE", "UNKNOWN"]},
+    "test_status": {"enum": ["TESTED", "FAILED", "NOT_REACHED", "NOT_APPLICABLE", "UNKNOWN"]},
+    "integration_status": {"enum": ["INTEGRATED", "FAILED", "NOT_REACHED", "NOT_APPLICABLE", "UNKNOWN"]},
+    "deployment_status": {"enum": ["DEPLOYED", "FAILED", "NOT_REACHED", "NOT_APPLICABLE", "UNKNOWN", "DEPLOYED_IN_CONTROLLED_ENVIRONMENT"]},
+    "runtime_proof_status": {"enum": ["PRODUCTION_VERIFIED", "FAILED", "NOT_REACHED", "NOT_APPLICABLE", "UNKNOWN", "RUNTIME_PROVEN"]},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tests", "integration", "deployment", "runtime_proof"],
+      "properties": {
+        "tests": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "integration": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "deployment": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "runtime_proof": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "close_condition": {"type": "string", "minLength": 1},
+    "start_head": {"type": "string", "pattern": "^(UNKNOWN|[a-f0-9]{40})$"},
+    "runtime_target": {"enum": ["NOT_APPLICABLE", "CONTROLLED_NON_PRODUCTION_RUNTIME", "PRODUCTION"]},
+    "close_head": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "block_records": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "reason_code",
+          "blocked_at",
+          "human_decision_id",
+          "agent_run_ref",
+          "resume_condition",
+          "resolved_at",
+          "resolution_human_decision_id"
+        ],
+        "properties": {
+          "type": {
+            "const": "EXTERNAL_DEPENDENCY"
+          },
+          "reason_code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$"
+          },
+          "blocked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "human_decision_id": {
+            "type": "string",
+            "pattern": "^HD-[0-9]{3,}$"
+          },
+          "agent_run_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^RUN-[A-Za-z0-9._-]+$"
+          },
+          "resume_condition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "resolution_human_decision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^HD-[0-9]{3,}$"
+          }
+        }
+      }
+    }
+  }
+}

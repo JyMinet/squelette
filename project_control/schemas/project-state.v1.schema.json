@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:governed-project:project-control:project-state:v1",
+  "title": "Project State v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "repository_role",
+    "project_name",
+    "project_key",
+    "project_owner",
+    "initialization",
+    "legacy_baseline",
+    "authorities_baseline",
+    "reporting_style",
+    "language"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "repository_role": {
+      "enum": [
+        "PROJECT_TEMPLATE",
+        "PROJECT"
+      ]
+    },
+    "project_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_key": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z][A-Z0-9_-]{0,31}$"
+    },
+    "project_owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "legacy_baseline": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "head",
+        "human_decision_ref"
+      ],
+      "properties": {
+        "head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "human_decision_ref": {
+          "type": "string",
+          "pattern": "^HD-[0-9]{3,}$"
+        }
+      }
+    },
+    "reporting_style": {
+      "enum": [
+        "TECHNICAL",
+        "PLAIN",
+        "UNKNOWN"
+      ]
+    },
+    "language": {
+      "enum": [
+        "FR",
+        "EN",
+        "UNKNOWN"
+      ]
+    },
+    "authorities_baseline": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "head",
+        "human_decision_ref"
+      ],
+      "properties": {
+        "head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "human_decision_ref": {
+          "type": "string",
+          "pattern": "^HD-[0-9]{3,}$"
+        }
+      }
+    },
+    "initialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "completion_human_decision_ref",
+        "completed_at",
+        "baseline_head",
+        "closeout_evidence"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_STARTED",
+            "COMPLETE"
+          ]
+        },
+        "completion_human_decision_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^HD-[0-9]{3,}$"
+        },
+        "completed_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "baseline_head": {
+          "type": "string",
+          "pattern": "^(UNKNOWN|[a-f0-9]{40})$"
+        },
+        "closeout_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

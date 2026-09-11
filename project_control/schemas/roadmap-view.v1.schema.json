@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:governed-project:project-control:roadmap-view:v1",
+  "title": "Roadmap View Settings v1",
+  "description": "Settings of the generated roadmap view (roadmap-view command): how it is rendered and where it is mirrored. No project data lives here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "style",
+    "zoom",
+    "regeneration",
+    "mirrors"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "style": {
+      "type": "string",
+      "enum": [
+        "FOLLOW_REPORTING_STYLE",
+        "TECHNICAL",
+        "PLAIN"
+      ]
+    },
+    "zoom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "past",
+        "far"
+      ],
+      "properties": {
+        "past": {
+          "type": "string",
+          "enum": [
+            "COLLAPSED",
+            "EXPANDED"
+          ]
+        },
+        "far": {
+          "type": "string",
+          "enum": [
+            "TITLES",
+            "DETAIL"
+          ]
+        }
+      }
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "fr",
+        "en"
+      ],
+      "description": "Ignored since 3.14.0: the language lives in project-state (language), with the reporting style. Still accepted so that a project upgraded from an earlier version stays valid."
+    },
+    "regeneration": {
+      "type": "string",
+      "enum": [
+        "OFF",
+        "HOURLY",
+        "EVERY_4_HOURS",
+        "DAILY"
+      ]
+    },
+    "mirrors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider",
+          "url"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

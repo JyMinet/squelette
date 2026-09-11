@@ -1,0 +1,8 @@
+#!/bin/sh
+# Project Control commit gate. Install once per checkout:
+#   git config core.hooksPath scripts/hooks
+# Read-only: runs the mode audit on the staged state and protects the canonical branch.
+# A human mandate bypasses the gate explicitly:
+#   PROJECT_CONTROL_HOOK_OVERRIDE="<mandat>" git commit ...
+root="$(git rev-parse --show-toplevel)" || exit 1
+exec python3 -B "$root/scripts/project_control.py" pre-commit

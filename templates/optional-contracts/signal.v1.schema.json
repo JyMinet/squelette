@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/templates/signal.v1.schema.json",
+  "title": "Optional Signal v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["signal_id", "timestamp", "input_refs", "input_hash", "method", "method_version", "value", "confidence", "rationale", "validation_status", "output_hash"],
+  "properties": {
+    "signal_id": {"type": "string", "minLength": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "input_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "input_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "method": {"type": "string", "minLength": 1},
+    "method_version": {"type": "string", "minLength": 1},
+    "value": {"type": ["number", "integer", "string", "boolean", "null"]},
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "rationale": {"type": "string", "minLength": 1},
+    "validation_status": {"enum": ["VALID", "REVIEW_REQUIRED", "UNKNOWN", "REJECTED"]},
+    "output_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "supersedes": {"type": ["string", "null"]}
+  }
+}

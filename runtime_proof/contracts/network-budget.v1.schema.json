@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Network Budget v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowed_hosts",
+    "max_entities",
+    "max_requests",
+    "minimum_request_interval_seconds",
+    "concurrency",
+    "timeout_seconds",
+    "maximum_response_bytes"
+  ],
+  "properties": {
+    "allowed_hosts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "allowed_endpoints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "max_entities": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_requests": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimum_request_interval_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "concurrency": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timeout_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "maximum_response_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "retry_policy": {
+      "type": "string"
+    },
+    "historical_access": {
+      "enum": [
+        "ALLOWED",
+        "FORBIDDEN",
+        "UNKNOWN"
+      ]
+    },
+    "backfill": {
+      "enum": [
+        "ALLOWED",
+        "FORBIDDEN",
+        "UNKNOWN"
+      ]
+    }
+  },
+  "$id": "urn:squelette-v3:runtime-proof:network-budget:v1"
+}

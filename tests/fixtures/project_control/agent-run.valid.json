@@ -1,0 +1,38 @@
+{
+  "$schema": "../../../project_control/schemas/agent-run.v1.schema.json",
+  "schema_version": "1.0.0",
+  "agent_run_ref": "RUN-101",
+  "provider": "GenericAgentSystem",
+  "work_item_id": "WI-001",
+  "requested_scope": [
+    "tests/fixtures/project_control"
+  ],
+  "base_head": "0123456789abcdef0123456789abcdef01234567",
+  "branch": "work/wi-001-generic-change",
+  "started_at": "2026-08-20T10:00:00Z",
+  "completed_at": "2026-08-20T10:05:00Z",
+  "result": "SUCCEEDED",
+  "commits": [
+    "89abcdef0123456789abcdef0123456789abcdef"
+  ],
+  "report_reference": "tests/fixtures/project_control/work-item.valid.json",
+  "start_head": "0123456789abcdef0123456789abcdef01234567",
+  "authorities_read": {
+    "manifest_digest": "b3d16aaf0b93cb74d8762d76d9db304fe86010a9d7f202102101294e304318aa",
+    "generated_at": "2026-08-20T10:00:00Z",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "scopes": [
+      "governance"
+    ],
+    "entries": [
+      {
+        "path": "AGENTS.md",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "path": "docs/governance/PROJECT_CHARTER.md",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ]
+  }
+}

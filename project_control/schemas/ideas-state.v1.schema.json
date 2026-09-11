@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:governed-project:project-control:ideas-state:v1",
+  "title": "Ideas State v1",
+  "description": "Ideas the Project Owner expressed, in their own words, with a closed state. An idea decides nothing: authorization stays a Human Decision and a Work Item. Synchronized with docs/governance/IDEAS.md (audit control IDEAS).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "updated_at", "idea_state_values", "ideas"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "1.0.0"},
+    "updated_at": {"type": "string"},
+    "idea_state_values": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "ideas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idea_id", "stated_at", "quote", "source", "state", "target", "note"],
+        "properties": {
+          "idea_id": {"type": "string", "pattern": "^ID-[0-9]{3,}$"},
+          "stated_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+          "quote": {"type": "string", "minLength": 1},
+          "source": {"type": "string", "minLength": 1},
+          "state": {"type": "string", "enum": ["EVOKED", "TO_CLARIFY", "TO_SET", "SCOPED", "PLANNED", "IN_PROGRESS", "REALIZED", "APPLIED", "INTEGRATED", "LATER", "DISCARDED"]},
+          "target": {"type": ["string", "null"], "minLength": 1},
+          "note": {"type": "string"}
+        }
+      }
+    }
+  }
+}

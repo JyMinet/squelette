@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/templates/decision-record.v1.schema.json",
+  "title": "Optional Decision Record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision_id", "timestamp", "input_snapshot_id", "input_hash", "engine_version", "decision", "rationale", "validation_status", "human_review", "output_hash"],
+  "properties": {
+    "decision_id": {"type": "string", "minLength": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "input_snapshot_id": {"type": "string", "minLength": 1},
+    "input_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "engine_version": {"type": "string", "minLength": 1},
+    "decision": {"type": ["object", "array", "string", "number", "integer", "boolean", "null"]},
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "rationale": {"type": "string", "minLength": 1},
+    "validation_status": {"enum": ["VALID", "REVIEW_REQUIRED", "UNKNOWN", "REJECTED"]},
+    "human_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "status", "reviewed_by", "reviewed_at", "decision_reference"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "status": {"enum": ["NOT_REQUIRED", "PENDING", "APPROVED", "REJECTED", "UNKNOWN"]},
+        "reviewed_by": {"type": ["string", "null"]},
+        "reviewed_at": {"type": ["string", "null"], "format": "date-time"},
+        "decision_reference": {"type": ["string", "null"]}
+      }
+    },
+    "output_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "supersedes": {"type": ["string", "null"]}
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "V3 Adoption Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "core_governance",
+    "decision_capability",
+    "runtime_proof",
+    "network_guard",
+    "secret_guard",
+    "evidence_journal",
+    "deduplication_proof",
+    "partial_failure"
+  ],
+  "properties": {
+    "decision_capability": {
+      "enum": [
+        "ON",
+        "OFF",
+        "UNKNOWN"
+      ]
+    },
+    "runtime_proof": {
+      "enum": [
+        "ON",
+        "OFF",
+        "UNKNOWN"
+      ]
+    },
+    "network_guard": {
+      "enum": [
+        "ON",
+        "OFF",
+        "UNKNOWN"
+      ]
+    },
+    "secret_guard": {
+      "enum": [
+        "ON",
+        "OFF",
+        "UNKNOWN"
+      ]
+    },
+    "evidence_journal": {
+      "enum": [
+        "ON",
+        "OFF",
+        "UNKNOWN"
+      ]
+    },
+    "deduplication_proof": {
+      "enum": [
+        "ON",
+        "OFF",
+        "UNKNOWN"
+      ]
+    },
+    "partial_failure": {
+      "enum": [
+        "ON",
+        "OFF",
+        "UNKNOWN"
+      ]
+    },
+    "core_governance": {
+      "const": "ON"
+    }
+  },
+  "$id": "urn:squelette-v3:runtime-proof:adoption-profile:v1"
+}

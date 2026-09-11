@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/templates/rehydration-manifest.v1.schema.json",
+  "title": "Optional Rehydration Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["domain", "artifact", "source_reference", "process", "process_version", "validation", "output_sha256", "status"],
+  "properties": {
+    "domain": {"type": "string", "minLength": 1},
+    "artifact": {"type": "string", "minLength": 1},
+    "source_reference": {"type": "string", "minLength": 1},
+    "process": {"type": "string", "minLength": 1},
+    "process_version": {"type": "string", "minLength": 1},
+    "validation": {"type": "object", "minProperties": 1},
+    "output_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "status": {"enum": ["CANDIDATE", "VALID", "REVIEW_REQUIRED", "REJECTED", "UNKNOWN"]}
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:governed-project:project-control:evidence:v1",
+  "title": "Evidence record v1",
+  "description": "Recorded claim with immutable local artifacts; not an independent runtime attestation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "work_item_id",
+    "gate",
+    "result",
+    "level",
+    "subject_commit",
+    "runtime_target",
+    "recorded_at",
+    "summary",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "work_item_id": {
+      "type": "string",
+      "pattern": "^WI-[0-9]{3,}$"
+    },
+    "gate": {
+      "enum": [
+        "tests",
+        "integration",
+        "deployment",
+        "runtime_proof"
+      ]
+    },
+    "result": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "level": {
+      "enum": [
+        "TESTED",
+        "INTEGRATED",
+        "DEPLOYED",
+        "DEPLOYED_IN_CONTROLLED_ENVIRONMENT",
+        "RUNTIME_PROVEN",
+        "PRODUCTION_VERIFIED"
+      ]
+    },
+    "subject_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "runtime_target": {
+      "enum": [
+        "NOT_APPLICABLE",
+        "CONTROLLED_NON_PRODUCTION_RUNTIME",
+        "PRODUCTION"
+      ]
+    },
+    "recorded_at": {
+      "type": "string",
+      "minLength": 1,
+      "format": "date-time"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

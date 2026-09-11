@@ -1,0 +1,16 @@
+{
+  "$schema": "../project_control/schemas/roadmap-view.v1.schema.json",
+  "schema_version": "1.0.0",
+  "style": "PLAIN",
+  "zoom": {
+    "past": "COLLAPSED",
+    "far": "TITLES"
+  },
+  "regeneration": "DAILY",
+  "mirrors": [
+    {
+      "provider": "claude",
+      "url": "https://claude.ai/code/artifact/6e74eaa9-8e15-492d-b89b-7156bf1588ba"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.DS_Store
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+reports/*.json
+reports/*.log
+data/runtime/
+data/generated/
+
+# Vue roadmap générée (roadmap-view --write) ; les données vivent dans les fichiers JSON et Markdown
+reports/roadmap/*.html
+provenance/roadmap/*.html
+
+# Fichiers déposés dans le dossier par une application (téléchargements d'une conversation) :
+# ils n'appartiennent pas au projet et ne doivent pas faire échouer sa traçabilité.
+Claude outputs/

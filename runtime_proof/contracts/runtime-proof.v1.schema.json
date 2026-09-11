@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Runtime Proof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proof_id",
+    "objective",
+    "mutation_mode",
+    "status",
+    "production_verified"
+  ],
+  "properties": {
+    "proof_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mutation_mode": {
+      "enum": [
+        "NON_MUTATING",
+        "AUTHORIZED_MUTATION"
+      ]
+    },
+    "status": {
+      "enum": [
+        "PLANNED",
+        "BLOCKED",
+        "FAIL",
+        "PARTIAL_FAILURE",
+        "PASS",
+        "RUNTIME_PROVEN"
+      ]
+    },
+    "production_verified": {
+      "enum": [
+        "YES",
+        "NO",
+        "UNKNOWN"
+      ]
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$id": "urn:squelette-v3:runtime-proof:runtime-proof:v1"
+}

@@ -1,0 +1,77 @@
+{
+  "schema_version": "3.0.0",
+  "rule": "Read base documents plus every document routed for the affected scopes before writing.",
+  "base": [
+    "AGENTS.md",
+    "docs/agent-governance/AGENTS.core.md",
+    "docs/governance/PROJECT_CHARTER.md",
+    "docs/governance/ROADMAP.md",
+    "docs/governance/roadmap-state.v1.json",
+    "docs/governance/REPOSITORY_STATUS.md",
+    "docs/governance/HUMAN_DECISIONS.md",
+    "docs/governance/DEFINITION_OF_DONE.md",
+    "docs/governance/WORKTREE_REGISTRY.md",
+    "project_control/README.md",
+    "project_control/project-state.v1.json"
+  ],
+  "scopes": {
+    "governance": [
+      "docs/governance/PROJECT_CHARTER.md",
+      "docs/governance/HUMAN_DECISIONS.md",
+      "docs/governance/ROADMAP.md",
+      "project_control/schemas/project-state.v1.schema.json",
+      "project_control/schemas/roadmap-state.v1.schema.json",
+      "docs/adr/README.md",
+      "ADOPTION.md",
+      "docs/agent-governance/ROADMAP_VIEW.md"
+    ],
+    "architecture": [
+      "docs/architecture/PROJECT_ARCHITECTURE_MAP.md",
+      "docs/architecture/INITIAL_ARCHITECTURE.md",
+      "docs/adr/ADR-0001-initial-architecture-boundaries.md"
+    ],
+    "contracts": [
+      "contracts/README.md",
+      "docs/architecture/PROJECT_ARCHITECTURE_MAP.md"
+    ],
+    "data": [
+      "data/README.md",
+      "docs/governance/STORAGE_POLICY.md",
+      "docs/governance/MIGRATION_RULES.md"
+    ],
+    "development": [
+      "project_control/README.md",
+      "project_control/schemas/work-item.v1.schema.json",
+      "project_control/schemas/conversation-reference.v1.schema.json",
+      "project_control/schemas/agent-run.v1.schema.json",
+      "docs/governance/DEFINITION_OF_DONE.md",
+      "scripts/check_git_traceability.py",
+      "project_control/schemas/evidence.v1.schema.json"
+    ],
+    "security": [
+      "docs/governance/PROJECT_CHARTER.md",
+      "docs/governance/STORAGE_POLICY.md",
+      "docs/governance/RECOVERY.md"
+    ],
+    "runtime": [
+      "docs/governance/REPOSITORY_STATUS.md",
+      "docs/governance/RECOVERY.md",
+      "docs/governance/WORKTREE_REGISTRY.md",
+      "project_control/deployments/README.md",
+      "ADOPTION.md",
+      "runtime_proof/README.md",
+      "runtime_proof/governance/RUNTIME_PROOF_POLICY.md",
+      "runtime_proof/governance/EVIDENCE_BOUNDARY_POLICY.md",
+      "runtime_proof/governance/NON_MUTATION_POLICY.md",
+      "runtime_proof/governance/NETWORK_BUDGET_POLICY.md",
+      "runtime_proof/governance/SECRET_HANDLING_POLICY.md",
+      "runtime_proof/governance/FAIL_CLOSED_POLICY.md"
+    ],
+    "recovery": [
+      "docs/governance/RECOVERY.md",
+      "docs/governance/STORAGE_POLICY.md",
+      "docs/governance/MIGRATION_RULES.md",
+      "docs/governance/REPOSITORY_STATUS.md"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0.0",
+  "policy": "Untracked paths are UNEXPLAINED unless explicitly classified here. Project Control may register only the exact record paths it creates transactionally.",
+  "PROJECT_CONTROL_GENERATED": [],
+  "PREEXISTING": [],
+  "CONCURRENT_WORK": []
+}

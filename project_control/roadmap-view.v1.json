@@ -1,0 +1,11 @@
+{
+  "$schema": "schemas/roadmap-view.v1.schema.json",
+  "schema_version": "1.0.0",
+  "style": "FOLLOW_REPORTING_STYLE",
+  "zoom": {
+    "past": "COLLAPSED",
+    "far": "TITLES"
+  },
+  "regeneration": "OFF",
+  "mirrors": []
+}

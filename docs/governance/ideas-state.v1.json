@@ -1,0 +1,19 @@
+{
+  "$schema": "../../project_control/schemas/ideas-state.v1.schema.json",
+  "schema_version": "1.0.0",
+  "updated_at": "UNKNOWN",
+  "idea_state_values": [
+    "EVOKED",
+    "TO_CLARIFY",
+    "TO_SET",
+    "SCOPED",
+    "PLANNED",
+    "IN_PROGRESS",
+    "REALIZED",
+    "APPLIED",
+    "INTEGRATED",
+    "LATER",
+    "DISCARDED"
+  ],
+  "ideas": []
+}

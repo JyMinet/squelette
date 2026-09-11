@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:governed-project:project-control:agent-run:v1",
+  "title": "Agent Run v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "agent_run_ref",
+    "provider",
+    "work_item_id",
+    "requested_scope",
+    "base_head",
+    "branch",
+    "started_at",
+    "completed_at",
+    "result",
+    "commits",
+    "report_reference",
+    "start_head"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent_run_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "work_item_id": {
+      "type": "string",
+      "pattern": "^WI-[0-9]{3,}$"
+    },
+    "requested_scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "base_head": {
+      "type": "string",
+      "pattern": "^(UNKNOWN|[a-f0-9]{40})$"
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "started_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completed_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "result": {
+      "enum": [
+        "IN_PROGRESS",
+        "SUCCEEDED",
+        "FAILED",
+        "PARTIAL",
+        "BLOCKED",
+        "UNKNOWN"
+      ]
+    },
+    "commits": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{40}$"
+      }
+    },
+    "report_reference": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "start_head": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "authorities_read": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_digest",
+        "generated_at",
+        "head",
+        "scopes",
+        "entries"
+      ],
+      "properties": {
+        "manifest_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "generated_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
