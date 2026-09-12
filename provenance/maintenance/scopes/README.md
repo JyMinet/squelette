@@ -34,6 +34,7 @@ Règles :
 | `p15-scope-amorcage-outille.md` | P15 | fiche de cadrage, close sans être ouverte (TPL-D-048) |
 | `p16-scope-garde-fou-de-commit.md` | P16 | fiche de cadrage, livrée en 3.16.1 et 3.16.2 |
 | `p17-scope-baseline-defigeable.md` | P17 | fiche de cadrage, réponses du Project Owner et livraison 3.18.0 |
+| `p7-scope-question-de-l-existant.md` | P7, étape 1 | fiche de cadrage : mandat de construction et avenant 1 (borne d'éligibilité, option A) |
 | `p18-scope-publication.md` | P18 | fiche de cadrage : le squelette sait se publier (script d'export anonymisé, 3.19.0) |
 | `mandat-codex-alpha-wi-061.md` | P2, étape 2 (Alpha) | mandat retiré, conservé comme trace |
 | `roadmap-squelette-memoire-claude.md` | P12, étape 1 | mémoire de la discussion ROADMAP côté Claude, figée à la migration |

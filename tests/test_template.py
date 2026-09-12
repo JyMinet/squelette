@@ -2347,6 +2347,29 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
         audit = run_control(root, "audit")
         self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
 
+    def test_resume_merges_under_the_installed_commit_gate(self) -> None:
+        """The same resume, with the gate a real project installs: it must still pass.
+
+        The suite builds its repositories without the commit gate, so every scenario that
+        depends on what the gate sees was measured without it. A resume that merges the
+        canonical branch into a blocked Work Item is exactly such a scenario: the sibling
+        closed in the meantime is reachable only through the merge."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        item, old_tip, canonical_tip = self.prepare_blocked_branch_with_own_commit_and_integrated_sibling(root)
+        self.install_commit_hook(root)
+
+        resumed = self.resume_lifecycle_work_item(root, "WI-001", "HD-105")
+        self.assertEqual(resumed.returncode, 0, resumed.stdout + resumed.stderr)
+        self.assertIn("merge commit", resumed.stdout)
+        merge_commit = run_git(root, "rev-parse", "HEAD").stdout.strip()
+        parents = run_git(root, "rev-list", "--parents", "-n", "1", merge_commit).stdout.split()[1:]
+        self.assertEqual(len(parents), 2, parents)
+        self.assertEqual(run_git(root, "merge-base", "--is-ancestor", canonical_tip, "HEAD").returncode, 0)
+        self.assertEqual(load_json(root / "project_control/work-items/WI-001.json")["status"], "IN_PROGRESS")
+        audit = run_control(root, "audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
+
     def test_resume_refuses_business_conflict_and_restores_git_state(self) -> None:
         temporary, root = self.make_normal_copy()
         self.addCleanup(temporary.cleanup)

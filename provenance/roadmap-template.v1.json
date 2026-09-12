@@ -1,10 +1,10 @@
 {
   "$schema": "../project_control/schemas/template-roadmap.v1.schema.json",
   "schema_version": "1.0.0",
-  "updated_at": "2026-09-09T00:51:04+02:00",
+  "updated_at": "2026-09-12T21:10:14+00:00",
   "template": {
     "name": "Squelette",
-    "repository": "Squelette V3 -runtime-proof (GitHub privé JyMinet/squelette, NAS NAS)",
+    "repository": "Squelette V3 -runtime-proof (GitHub privé JyMinet/squelette-atelier, NAS NAS) — miroir public JyMinet/squelette",
     "backups": [
       "origin (GitHub)",
       "nas (NAS)"
@@ -289,6 +289,15 @@
       "decisions": [
         "TPL-D-065"
       ]
+    },
+    {
+      "version": "3.19.2",
+      "date": "2026-09-12",
+      "label": "ce que le prochain commit portera vraiment",
+      "decisions": [
+        "TPL-D-070",
+        "TPL-D-072"
+      ]
     }
   ],
   "next_version": null,
@@ -377,11 +386,13 @@
     {
       "id": "P7",
       "title": "Critères d'entrée d'un chantier",
-      "state": "TO_SCOPE",
-      "summary": "Pas encore de fiche.",
+      "state": "SCOPED",
+      "summary": "Étape 1 « la question de l'existant » cadrée et revue par deux contrôleurs indépendants ; borne d'éligibilité tranchée (option A, la marque voyage dans la fiche) ; construction non commencée.",
       "versions": [],
-      "decisions": [],
-      "scope": null
+      "decisions": [
+        "TPL-D-071"
+      ],
+      "scope": "provenance/maintenance/scopes/p7-scope-question-de-l-existant.md"
     },
     {
       "id": "P8",
@@ -556,7 +567,7 @@
       "source": "journal du squelette (TPL-D-057, TPL-D-059, TPL-D-065) ; décisions HD-074 à HD-077 d'Alpha"
     },
     {
-      "text": "Cinq passes de contrôle indépendant depuis le 10 septembre : vingt et un défauts démontrés, tous corrigés avec leur essai. La cinquième a trouvé que le rangement des copies jetables de la 3.18.2 pouvait effacer le worktree d'un autre, et qu'un nom accentué échappait à la règle de contenu des fusions — fermés en 3.19.1. Reste une contre-vérification ciblée de ces six corrections, puis une pause sans nouvelle règle. La première copie publique est produite (3.19.1, nom « squelette ») ; la mettre en ligne est un geste du Project Owner.",
+      "text": "Cinq passes de contrôle indépendant depuis le 10 septembre : vingt et un défauts démontrés, tous corrigés avec leur essai. La cinquième a trouvé que le rangement des copies jetables de la 3.18.2 pouvait effacer le worktree d'un autre, et qu'un nom accentué échappait à la règle de contenu des fusions — fermés en 3.19.1. Reste une contre-vérification ciblée de ces six corrections, puis une pause sans nouvelle règle. Le squelette est public depuis le 11 septembre : JyMinet/squelette, première version 3.19.1, miroir anonymisé du dépôt privé.",
       "tone": "warn",
       "source": "rapports sous provenance/maintenance/ ; journal du squelette (TPL-D-059, TPL-D-065)"
     },
@@ -568,9 +579,9 @@
   ],
   "waiting_for_owner": [
     {
-      "title": "Publier le miroir : renommer, créer, pousser",
-      "detail": "la première copie publique (3.19.1) est produite dans ~/Projets/squelette, vérifiée, un commit et un tag, rien d'envoyé. Tes gestes, dans l'ordre : renommer le dépôt privé en squelette-atelier sur GitHub et mettre à jour son adresse origin ; créer le dépôt public squelette, vide ; pousser main et le tag depuis ~/Projets/squelette ; About, Topics, release. Et toujours : l'envoi de la 3.19.0 et de la 3.19.1 du privé vers origin et le NAS, plus leurs releases.",
-      "source": "journal du squelette (TPL-D-063 à TPL-D-067)"
+      "title": "Le miroir public est en ligne : About et Topics",
+      "detail": "https://github.com/JyMinet/squelette — première version publique 3.19.1, tag et release posés le 11 septembre ; le privé est devenu squelette-atelier. Restent About et Topics sur le dépôt public, comme sur le privé, et les releases 3.19.0 et 3.19.1 du privé si tu y tiens (script publier-les-releases.sh).",
+      "source": "journal du squelette (TPL-D-067) ; gestes du Project Owner du 11 septembre"
     },
     {
       "title": "Contre-vérification ciblée de la 3.19.1",

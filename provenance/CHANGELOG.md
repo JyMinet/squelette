@@ -669,7 +669,92 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   l'octet, manifeste `3.19.1`, plus la maintenance de publication du jour — et porte le tag
   `v3.19.1` de son côté. Rien n'est envoyé :
   renommer le privé, créer le dépôt public et pousser sont les gestes du Project Owner
-  (`TPL-D-004`).
+  (`TPL-D-004`). **Faits le jour même** : le privé renommé `JyMinet/squelette-atelier` et poussé
+  (`origin` et NAS à `b256b08`), le dépôt public `JyMinet/squelette` créé, `main` et le tag
+  `v3.19.1` poussés, release publiée — https://github.com/JyMinet/squelette/releases/tag/v3.19.1.
+
+## Décisions du Project Owner — 2026-09-12
+
+- `TPL-D-068` — **Le rapport de la seconde revue indépendante rejoint la collection.** La série
+  des rapports de contrôle sous `provenance/maintenance/` allait de la `3.9.0` à la `3.18.2` sans
+  trou, sauf un : la seconde revue indépendante, confiée au fournisseur Codex sur le tag `v3.13.0`
+  (`ad95129`), sept constats dont deux `MAJOR` et le verdict
+  `SQUELETTE_3.13.0_REVUE_REQUIRES_MAJOR_REDLINE`, était restée dans son atelier
+  (`~/Projets/squelette-revue-2`) au lieu de suivre ses correctifs dans le dépôt.
+  Ses constats, eux, ont bien été traités le 2026-09-09 par la `3.14.0` (`TPL-D-031`), avec le
+  huitième que leur contre-vérification a fait apparaître. Mandat : « Rapatrier ce rapport dans
+  provenance/maintenance/, nommé comme les autres de la série » (2026-09-12). Le rapport est copié
+  tel quel, octet pour octet, sous le nom de la série et daté du jour de la revue :
+  `provenance/maintenance/2026-09-09-controle-independant-3.13.0.md`, SHA-256
+  `7e6049017a14d2265e48d2d22892078f47ba7b5064b4aeb035ede2f5948f2ab4`. Rien d'autre ne change :
+  aucun fichier core, aucune version nouvelle, aucune promotion, la vue n'est pas régénérée. Les
+  liens de preuve que le rapport porte désignent les `runs/` de son atelier, qui ne le suit pas
+  dans le dépôt — comme les rapports voisins, qui nomment leurs `runs/` sans les emporter. Dette
+  notée, hors périmètre : la contre-revue (`contre-revue-3.13.0.md`), qui a confirmé les sept
+  constats et en a établi un huitième, reste elle aussi hors du dépôt.
+- `TPL-D-069` — **La contre-revue rejoint le rapport qu'elle contre-vérifie ; la dette de
+  `TPL-D-068` est soldée le jour même.** Le jour de la seconde revue indépendante, sa
+  contre-vérification confirmait ses sept constats, n'en rejetait aucun, et en établissait un
+  huitième plus grave, trouvé en vérifiant le premier : le garde-fou de commit annonçait « audit
+  PASS on the staged state » alors qu'il lisait l'arbre de travail, si bien qu'un record de
+  gouvernance falsifié, indexé puis masqué, entrait dans l'historique avec son accord. C'est elle
+  qui a cadré le lot unique de la `3.14.0` (`TPL-D-031`). Elle n'avait jamais quitté l'espace de
+  travail de l'agent : ni dans le dépôt, ni sur le poste du Project Owner. Mandat : « go »
+  (2026-09-12), sur la proposition de la faire rentrer par le même chemin que le rapport. Elle est
+  écrite telle quelle sous `provenance/maintenance/2026-09-09-contre-revue-3.13.0.md`, à la date de
+  sa rédaction, SHA-256
+  `6ca656f9cd518d9d22e74845610f816a53175a2188371dbb8b1b713e7fbefe2a`. Son texte n'est pas retouché :
+  elle désigne le rapport par le nom qu'il portait dans l'atelier (`REVUE_SQUELETTE_3.13.0.md`),
+  devenu `2026-09-09-controle-independant-3.13.0.md` dans le dépôt — un rapport rapatrié se
+  copie, il ne se réécrit pas. Rien d'autre ne change : aucun fichier core, aucune version
+  nouvelle, aucune promotion, la vue n'est pas régénérée. Avec `TPL-D-068`, le dossier de la
+  seconde revue est désormais complet dans le dépôt : le rapport, et ce qui l'a contre-vérifié.
+
+- `TPL-D-070` — **La reprise d'un chantier bloqué passe le garde-fou.** La revue indépendante de
+  « P7 étape 1 » (deux contrôleurs séparés, dossier `squelette-revue-p7`) a trouvé, en cherchant
+  autre chose, un défaut du contrôleur `3.19.1` : **avec le garde-fou installé, un chantier bloqué
+  qui porte ses propres commits ne peut plus reprendre dès qu'un autre chantier a été clos entre
+  temps sur la canonique.** La fusion d'alignement est refusée parce que le commit de clôture du
+  chantier voisin est jugé contre la seule branche courante, qui ne le contient pas encore.
+  Reproduit, puis expliqué : la suite d'essais ne le voyait pas parce qu'elle monte ses dépôts
+  **sans installer le garde-fou** — le même parcours passe sans lui et échoue avec. Décision :
+  « Option A, et le grain de sable d'abord » (2026-09-12), sur la proposition de corriger ce
+  défaut avant de construire P7, un prototype bâti sur un contrôleur qui refuse une reprise
+  légitime ne se vérifiant pas proprement. Correctif sur `claude/v3.19.2-reprise-sous-garde-fou`,
+  version `3.19.2` ; la promotion reste une décision séparée.
+
+- `TPL-D-071` — **La borne d'éligibilité de « la question de l'existant » : l'option A, et le
+  dossier du chantier rejoint le dépôt.** L'étape 1 de P7 ajoute à la fiche d'un chantier une ligne
+  « qu'est-ce qui existe déjà là-dessus, et où ? », avec deux réponses possibles et un refus au
+  démarrage tant qu'elle manque. La phase de mesure, en lecture seule, a levé un arrêt : la règle ne
+  doit valoir que pour les chantiers ouverts après son arrivée, or aucune des deux baselines
+  déclarées (`legacy_baseline`, `authorities_baseline`) ne date l'adoption d'une **version** par un
+  projet. Revue par deux contrôleurs indépendants (dossier `squelette-revue-p7`, rapports rapatriés
+  ci-dessous), puis réconciliation. Décision : « Option A » (2026-09-12) — **la marque voyage dans la
+  fiche** : la voie d'admission marque la fiche, le contrôleur ne réclame la déclaration qu'aux
+  fiches marquées, les fiches déjà présentes n'en portent pas et ne sont jamais interrogées. L'option
+  C (borne déduite de l'historique Git) est **écartée** : elle se fausse en silence sur un historique
+  regroupé, exporté, cloné superficiellement ou ramené en arrière. Les options B (borne signée par
+  décision, forme de `authorities_baseline`) et D (inventaire figé à la montée) restent des replis
+  documentés. L'avenant 1 ajoute quatre définitions sans lesquelles la règle se contredit en usage
+  réel — « ouvert » veut dire admis et non démarré ; toutes les voies d'admission posent la marque, et
+  une fiche arrivée autrement est **ancienne** mais signalée ; la déclaration est exigée au premier
+  départ effectif, `resume` compris ; une fiche administrative ne périme jamais sa propre empreinte de
+  lecture — plus trois comportements à démontrer (B11 à B13) et un **erratum** au rapport de mesure :
+  sa conclusion « le record n'entre pas dans l'empreinte » vaut pour le routage livré, pas pour un
+  projet libre de sa liste. Le chantier passe à `SCOPED` ; la construction n'est pas commencée et
+  reste prévue pour la `3.20.0`, après le correctif `3.19.2`.
+
+- `TPL-D-072` — **Promotion de la `3.19.2`.** « Promeus, puis enchaîne » (2026-09-12), sur la
+  proposition de promouvoir avant d'entreprendre quoi que ce soit d'autre : un projet ne monte que
+  depuis une version promue et étiquetée, jamais depuis une branche de travail.
+  `claude/v3.19.2-reprise-sous-garde-fou` est promue branche canonique par fast-forward de `main` ;
+  la baseline promue reçoit le tag `v3.19.2`, posé sur le commit qui enregistre cette décision ; la
+  vue est régénérée ensuite et committée à part, si bien que `main` est un commit devant le tag.
+  L'envoi vers `origin` et vers le NAS, ainsi que la release GitHub, restent les gestes du Project
+  Owner (`TPL-D-004`). Suite annoncée le même jour : la montée d'Alpha — en `3.18.1`,
+  elle passera donc directement en `3.19.2` — puis le rafraîchissement du miroir public anonymisé,
+  chacun sous son propre double arrêt.
 
 ## Décisions du Project Owner — 2026-09-10 (suite 10)
 
@@ -683,6 +768,46 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   d'abord** `F-08`, la baseline défigeable, qui demande d'ancrer une déclaration à la décision qui
   la nomme, donc de toucher au format des décisions, alors qu'Alpha en a deux
   déclarées. La promotion reste une décision séparée.
+
+## 2026-09-12 — `claude/v3.19.2-reprise-sous-garde-fou` — ce que le prochain commit portera vraiment
+
+- Mandat : `TPL-D-070`. Double arrêt : `STOP 1` (dossier cible, action, alternative : garder le
+  correctif dans la copie de session et remettre un patch) → « Le correctif et le rangement » ;
+  `STOP 2` (périmètre exact reformulé) → « Confirmé : branche
+  claude/v3.19.2-reprise-sous-garde-fou dans ~/Projets/Squelette V3 -runtime-proof,
+  main intouché, pas de tag, pas de push. »
+- Baseline : `main` à `ebf62f4` (`v3.19.1` = `ae8bace`, plus trois commits de provenance).
+- Origine : la revue indépendante de « P7 étape 1 — le choix de la borne d'éligibilité »
+  (`squelette-revue-p7`, deux contrôleurs, verdict `REQUIRES_MAJOR_REDLINE`). Le défaut n'a rien
+  à voir avec la question de l'existant ; il a été rencontré en la mesurant.
+- **Le défaut.** `done_evidence_errors` juge le `close_head` d'un chantier `DONE` par
+  `merge-base --is-ancestor <close_head> HEAD`. Pendant la fusion d'alignement d'une reprise, la
+  branche courante ne contient pas encore la canonique : le commit de clôture du chantier voisin
+  n'y est pas, le contrôle échoue, et le garde-fou refuse le commit de fusion
+  (`MODE_AUDIT — SCHEMA_VALIDATION: WI-002: close_head is missing or not in current history`).
+  Le même refus tombe sur la photo de l'index, construite par `staged_worktree` avec `HEAD` pour
+  seul parent alors que le commit réel en aura deux.
+- **Pourquoi la suite ne le voyait pas.** `make_normal_copy` ne pose pas le garde-fou, et deux
+  essais seulement l'installent. `test_resume_aligns_diverged_branch_by_merge_and_closes`
+  mesurait donc un parcours qui n'existe pas chez un utilisateur. Règle à retenir : un essai qui
+  porte sur ce que le garde-fou voit doit installer le garde-fou.
+- **Le correctif, deux touches de la même idée.** `history_heads()` nomme ce dont le prochain
+  commit descendra — `HEAD`, plus chaque parent inscrit dans `MERGE_HEAD`, lu ligne par ligne pour
+  ne pas perdre une fusion à plus de deux parents ; `in_current_history()` juge une ascendance
+  contre cet ensemble et non contre `HEAD` seul. `done_evidence_errors` l'emploie ; `staged_worktree`
+  fabrique désormais sa photo avec les mêmes parents que le commit réel, ce que sa propre docstring
+  promettait déjà (« exactly what the commit would create »).
+- **Essai ajouté**, rouge avant, vert après :
+  `test_resume_merges_under_the_installed_commit_gate` — le même parcours de reprise, avec
+  `install-gate` posé avant la fusion.
+- 165 essais verts (164 + 1) ; démo régénérée (`demo.py --write`, la seule différence est la ligne
+  de version) ; manifeste du core à `3.19.2`, 24 fichiers.
+- **Rien à réinstaller.** `scripts/hooks/pre-commit` n'a pas changé : il appelle le contrôleur, et
+  c'est le contrôleur qui est corrigé. Un projet déjà monté reçoit le correctif par
+  `template-upgrade` sans rejouer `install-gate` pour ce motif.
+- Portée volontairement étroite : les autres tests d'ascendance contre `HEAD` (baselines déclarées,
+  contrôles de clôture, `status`) ne sont pas touchés, faute de scénario d'échec démontré. Observation
+  laissée ouverte : ils jugeraient de la même façon un commit arrivant par une fusion en cours.
 
 ## 2026-09-11 — `claude/v3.19.1-noms-et-copies` — les noms lus tels quels, les copies prouvées siennes
 

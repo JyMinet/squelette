@@ -4156,6 +4156,36 @@ class ProjectControl:
             self.run_git(["worktree", "prune"])
         return removed
 
+    def history_heads(self) -> list[str]:
+        """The commits the next commit will descend from: HEAD, and any merge in progress.
+
+        During a merge the branch tip does not yet hold what the merge brings in. Judging an
+        administrative commit against HEAD alone therefore refuses, at the very moment of the
+        merge, a record whose closure arrives with it: with the gate installed, a blocked Work
+        Item could no longer be resumed once a sibling had been closed on the canonical branch.
+        The suite did not see it because it builds its repositories without the gate."""
+        heads: list[str] = []
+        head = self.run_git(["rev-parse", "--verify", "--quiet", "HEAD"])
+        if head.returncode == 0 and SHA40.fullmatch(head.stdout.strip()):
+            heads.append(head.stdout.strip())
+        located = self.run_git(["rev-parse", "--git-path", "MERGE_HEAD"])
+        if located.returncode == 0 and located.stdout.strip():
+            try:
+                # MERGE_HEAD holds one line per incoming parent; read them all rather than
+                # resolve the ref, which would name only the first.
+                merging = (self.root / located.stdout.strip()).read_text(encoding="utf-8").split()
+            except OSError:
+                merging = []
+            heads.extend(parent for parent in merging if SHA40.fullmatch(parent) and parent not in heads)
+        return heads
+
+    def in_current_history(self, commit: str) -> bool:
+        """Is this commit already part of what the next commit will descend from?"""
+        return any(
+            self.run_git(["merge-base", "--is-ancestor", commit, head]).returncode == 0
+            for head in self.history_heads()
+        )
+
     @contextlib.contextmanager
     def staged_worktree(self) -> Any:
         """A throwaway checkout of exactly what the commit would create, or None.
@@ -4171,8 +4201,9 @@ class ProjectControl:
         if tree.returncode != 0 or not SHA40.fullmatch(digest):
             yield None
             return
-        head = self.run_git(["rev-parse", "--verify", "HEAD"])
-        parents = ["-p", head.stdout.strip()] if head.returncode == 0 and SHA40.fullmatch(head.stdout.strip()) else []
+        # The commit Git is about to make descends from HEAD and from any merge in progress:
+        # a photograph carrying the branch tip alone is not what the commit would create.
+        parents = [argument for parent in self.history_heads() for argument in ("-p", parent)]
         commit = self.run_git(["commit-tree", digest, *parents, "-m", "project-control: staged state"])
         if commit.returncode != 0 or not SHA40.fullmatch(commit.stdout.strip()):
             yield None
@@ -5805,7 +5836,7 @@ class ProjectControl:
         except (ProjectControlError, OSError, ValueError) as exc:
             return [str(exc)]
         baseline = item.get("close_head")
-        if not SHA40.fullmatch(str(baseline)) or self.run_git(["merge-base", "--is-ancestor", baseline, "HEAD"]).returncode != 0:
+        if not SHA40.fullmatch(str(baseline)) or not self.in_current_history(str(baseline)):
             return [f"{work_item_id}: close_head is missing or not in current history"]
         errors: list[str] = []
         for gate in EVIDENCE_GATES:
