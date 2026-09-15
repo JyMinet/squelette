@@ -1,14 +1,14 @@
 {
   "schema_version": "1.0.0",
-  "skeleton_version": "3.19.2",
+  "skeleton_version": "3.20.0",
   "core": {
     "ADOPTION.md": "f7d494c64c2cddc2dbdbb1ea61f19fddab34b3e47b269b3959640c239fdf7fbe",
     "CLAUDE.md": "b2e21d4dada733ee89dec030e628d1b28398463ea2b72586910fda1b0c5a5f14",
     "FIRST_START.md": "c83e2351b7c1ae461c6723c108e564c69f5bb0ff0ee2870cb9a0287e2597e7a2",
-    "docs/agent-governance/AGENTS.core.md": "dd2531d349ba7e9a8ebbe2eba4f9fe4163e7e05ccb053d36f79e3c9b5d6c1907",
+    "docs/agent-governance/AGENTS.core.md": "bc82f3f502949dd6c407f94493bd0d1b6a801d47b55e1d784fd08e927a89fa6f",
     "docs/agent-governance/ROADMAP_VIEW.md": "c825b3c0e8adf7685078ca2f30667a913722e31fe589f81c9f170ad2f19e6a96",
     "docs/governance/DEFINITION_OF_DONE.md": "8f152bdcd79a80b733d749efecf242f050e2a827e117973c4b5a8382623f874f",
-    "project_control/README.md": "c3b3b5920dd28a41f79c2627ecc622760aab6ea01812643bc4e3e6ea2f01ad98",
+    "project_control/README.md": "59c86a5dd93944ed8a0d649c2ba3e69267337f3cb37e178a67e6d20a15caf653",
     "project_control/schemas/agent-run.v1.schema.json": "13e152562953a3c7677c273c5f415d1f4a5fbe57d3c36f2d301462cc9cc498bf",
     "project_control/schemas/conversation-reference.v1.schema.json": "8453e3909c8791b20e83bb625baa8b599ebf4fa513718516130b134ca0fde876",
     "project_control/schemas/evidence.v1.schema.json": "0921bff830b6e2f5b5933bd1efb15a9d04cd39e9d14b59d88d0e7c7ebbfcb2ba",
@@ -20,11 +20,11 @@
     "project_control/schemas/work-item.v1.schema.json": "52423cacc127ccb60bb8ffd638172033d9b4251b6be08f587f4f0e685f09afd0",
     "scripts/check_git_traceability.py": "17fffd7609f366888ba56f4173ccd11243e3bfaa4910fb47f8cb8d99b32fbc26",
     "scripts/hooks/pre-commit": "e6e5908ae426ed2857e026736434e34e9e193c32bf7af2495d30f287d32d8516",
-    "scripts/project_control.py": "69bf6fcb640932004b8e624feae8690325b40c4546e08aa2e410ab2858209dce",
+    "scripts/project_control.py": "21294605fd1e396adeb12077a945ee42c9754f0ee39d45c3d458f280ca30e080",
     "scripts/roadmap_view.py": "56dc0d0a3a6d58f4724c337d21493a888eff47407573422f47994b2ad484d070",
     "tests/fixtures/project_control/agent-run.valid.json": "24fcd7f92d19a5edba3c262a0e7b6254359e2ee3918530e05e77fa08b37990ae",
     "tests/fixtures/project_control/conversation.valid.json": "4f78b22f0fb90c8ef2ec84a98671402c5d664579351f724cd0bbfabe3ccaefc2",
     "tests/fixtures/project_control/work-item.valid.json": "e6445e327d8d8adf7709d9135404bf654f49c959ffad6f937bda0c5920648f82",
-    "tests/test_template.py": "a71dde88b9ecaf4d8e9816cf15b03ff9afb5c9968f7aa979ecfb9ed45ae978db"
+    "tests/test_template.py": "65803e29cb735286325cd0dac3a65622dd68b2cb564780b1c87031f9c7cdaa26"
   }
 }

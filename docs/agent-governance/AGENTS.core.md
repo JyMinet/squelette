@@ -116,7 +116,9 @@ celle du Work Item seul, telle que `context-manifest WI-NNN` l’affiche sans `-
 Les records tenus par Project Control lui-même (roadmap, registre de branches,
 classifications, Project State) n’en font pas partie : ils changent à chaque
 transition sans porter d’autorité nouvelle. `HUMAN_DECISIONS.md` en fait partie : une
-décision enregistrée est une autorité.
+décision enregistrée est une autorité. Quand le registre a été coupé en deux volumes
+(voir plus bas), c’est le **carnet vivant** qui est routé, sommaire compris ; le volume
+relié ne l’est pas et n’entre donc dans aucune empreinte.
 
 `start` et `resume` refusent sans `--authorities-digest` égal à l’empreinte courante,
 et ne l’affichent jamais : l’agent la présente après avoir lu, le contrôleur ne la
@@ -396,3 +398,69 @@ elle sort du dossier accordé. L'exemption suit l'état et non le nom : une déc
 depuis la baseline repasse sous la règle courante. Aucune transition d'aujourd'hui n'en
 bénéficie : `create-work-item`, `block`, `resume` et `close` lisent leur mandat en entier,
 si bien qu'un refus enregistré ne peut jamais autoriser un travail nouveau.
+
+### Deux volumes : le carnet vivant et le volume relié
+
+Le registre des décisions est lu à chaque démarrage et ne fait que grossir. Un projet peut
+le couper en deux, **sur décision humaine et par le contrôleur seul** :
+
+- le **carnet vivant**, `docs/governance/HUMAN_DECISIONS.md`, garde les décisions
+  postérieures à la baseline d’adoption et reçoit un **sommaire** — une ligne par décision
+  reliée : numéro, date, `Decision`, première ligne de `Chosen option`, recopiées telles
+  qu’elles ont été écrites. Il reste l’autorité routée, lue à chaque `start` ;
+- le **volume relié**, `docs/governance/HUMAN_DECISIONS_VOLUME_1.md`, garde les décisions
+  figées par la baseline d’adoption, **à l’octet près**. Il n’est pas routé : on ne le lit
+  pas au démarrage, on l’ouvre au besoin avec `decision show HD-NNN`.
+
+La ligne de coupe est la baseline d’adoption déjà déclarée : aucun objet nouveau, aucune
+troisième baseline. La promesse « jamais reconstruites ni requalifiées » s’étend au
+déplacement — relier une décision ne la réécrit pas, ne la résume pas et ne lui retire pas
+l’exemption de vocabulaire ci-dessus : le contrôleur résout, audite et affiche une décision
+dans l’un ou l’autre volume, indifféremment.
+
+`decision bind --human-decision HD-NNN` exécute la coupe depuis la canonique, sur un
+worktree propre, et committe lui-même le résultat. Il **refuse** et n’écrit rien si le projet
+ne déclare pas de baseline d’adoption, si un seul bloc figé diffère de sa forme à la
+baseline, si une seule référence cesserait de se résoudre, ou si un volume existe déjà :
+relier de nouveau est une décision humaine, pas une répétition. Une décision neuve est
+toujours enregistrée dans le carnet vivant, jamais dans un volume. `decision show HD-NNN`
+est en lecture seule.
+
+Le volume **nomme le commit auquel il a été relié** (`Adoption baseline:`), et c’est à ce
+commit-là que l’audit compare — jamais à la baseline que le projet déclare aujourd’hui, qui peut
+légitimement avancer. Le contrôle `DECISION_VOLUMES_CONSISTENT` vérifie à chaque audit, dans cet
+ordre : **qu’aucune décision n’a disparu** — chaque décision enregistrée à cette origine est
+encore dans l’un des deux volumes, même si aucun record ne la cite ; que chaque bloc relié est
+identique à sa forme à cette origine ; que le sommaire est **complet et fidèle** — une ligne par
+décision reliée, et chaque ligne exactement celle que le contrôleur écrirait aujourd’hui pour la
+décision qu’elle nomme ; qu’aucune décision n’est dans les deux volumes ; et qu’aucune décision
+postérieure à la ligne de coupe n’a été reliée. Vérifier seulement l’intégrité de ce qu’on
+retrouve laisserait une décision que personne ne cite disparaître avec sa ligne de sommaire.
+Origine illisible, origine non nommée, déclaration d’adoption retirée : échec explicite, jamais
+substitution silencieuse. Un projet qui n’a rien relié se comporte exactement comme avant : le
+volume n’existe pas, et rien ne change.
+
+Un bloc va de son titre `## HD-NNN` au titre suivant, ou à la fin du fichier ; les lignes vides
+qui l’entourent lui appartiennent, et l’égalité se juge sur ce texte. La reliure est une
+transaction comme les autres écritures administratives : elle écrit, vérifie, committe, et
+défait tout si l’une des trois échoue — un refus ne laisse jamais une demi-reliure.
+
+Trois choses restent distinctes, et une décision reliée n’en franchit aucune : **retrouvée** n’est
+pas **admissible**, et **admissible** n’est pas **lue**. Vivre dans un volume ne crée aucune
+exemption : une transition d’aujourd’hui lit son mandat en entier, où qu’il soit enregistré. Et la
+preuve de lecture atteste ce que le manifeste énumère — le carnet vivant et son sommaire — jamais
+le texte conservé dans le volume : `decision show` donne accès au texte, il ne fabrique pas une
+preuve de lecture.
+
+Les lignes de sommaire sont des **repères**, pas des énoncés de décision : coupées, elles ne
+disent pas ce qui vient après, et deux décisions peuvent partager le même début. Seul le texte
+conservé dans le volume énonce le choix humain ; l’identifiant est ce qui permet de le retrouver.
+
+Le contrôleur **rappelle, il ne relie jamais de lui-même**. Tant qu’aucun volume n’existe, qu’une
+baseline d’adoption est déclarée et que les décisions figées pèsent au moins un tiers du registre,
+`status` le dit en une ligne et nomme la commande. Une fois la reliure faite, cette ligne cède la
+place au décompte des deux volumes. Deux limites assumées : le carnet vivant se remplit à nouveau,
+et relier une seconde fois demanderait de déplacer la ligne de coupe — une décision humaine et une
+mécanique que cette version ne construit pas ; le journal du squelette lui-même n’est routé nulle
+part, si bien qu’un chantier sur le squelette n’est pas tenu de le lire. Les deux sont inscrites
+comme dettes connues dans la feuille de route.

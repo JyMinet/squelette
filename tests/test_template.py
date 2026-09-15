@@ -2602,6 +2602,430 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
         self.assertNotEqual(amended, block)
         path.write_text(text.replace(block, amended), encoding="utf-8")
 
+
+    # --- P19 — two volumes: the living notebook and the bound volume -------------------
+
+    BIND_DECISION_TEXT = (
+        "Bind the Human Decisions frozen at the adoption baseline into volume 1."
+    )
+
+    def record_bind_decision(self, root: Path, decision_id: str) -> str:
+        """Record the human authorization a binding needs, and commit it."""
+        path = root / "docs/governance/HUMAN_DECISIONS.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").rstrip() + "\n"
+            f"\n## {decision_id}\n\n"
+            f"Date: {self.control_module.today_iso()}\n"
+            f"Decision: {self.BIND_DECISION_TEXT}\n"
+            "Context: The register is read at every start and only grows.\n"
+            "Options considered: AUTHORIZE | REJECT\n"
+            "Chosen option: AUTHORIZE\n"
+            "Reason: Frozen decisions are kept intact and consulted on demand.\n"
+            "Scope: docs/governance/HUMAN_DECISIONS.md and its bound volume.\n"
+            "Reversible: YES\n"
+            "Conversation reference: CONV-101\n"
+            "Related ADR: NOT_APPLICABLE\n"
+            "Related Work Item: NOT_APPLICABLE\n"
+            "Authorized by: Project Owner\n",
+            encoding="utf-8",
+        )
+        return self.commit_fixture(root, f"chore: authorize the binding ({decision_id})")
+
+    def bound_project(self, decision_id: str = "HD-110") -> tuple[tempfile.TemporaryDirectory, Path, list[str], dict[str, str]]:
+        """A project whose frozen decisions have been bound; returns the blocks as recorded."""
+        temporary, root = self.make_normal_copy()
+        frozen_head = run_git(root, "rev-parse", "HEAD").stdout.strip()
+        self.declare_legacy_baseline(root, frozen_head, "HD-105")
+        self.record_bind_decision(root, decision_id)
+        notebook = (root / "docs/governance/HUMAN_DECISIONS.md").read_text(encoding="utf-8")
+        recorded = {
+            reference: recorded_decision_block(notebook, reference)
+            for reference in re.findall(r"(?m)^## (HD-[0-9]{3,})\s*$", notebook)
+        }
+        bound = run_control(root, "decision", "bind", "--human-decision", decision_id)
+        self.assertEqual(bound.returncode, 0, bound.stdout + bound.stderr)
+        return temporary, root, ["HD-101"], recorded
+
+    def test_binding_moves_the_frozen_decisions_and_keeps_their_text_to_the_byte(self) -> None:
+        """B1. The cut moves text and changes nothing else: every bound block keeps the bytes it
+        had, the living notebook keeps the decisions recorded after the baseline, and gains one
+        summary line per bound decision."""
+        temporary, root, bound, recorded = self.bound_project()
+        self.addCleanup(temporary.cleanup)
+        volume = root / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md"
+        self.assertTrue(volume.is_file(), "the bound volume is written")
+        volume_text = volume.read_text(encoding="utf-8")
+        notebook = (root / "docs/governance/HUMAN_DECISIONS.md").read_text(encoding="utf-8")
+        for reference in bound:
+            self.assertEqual(
+                recorded_decision_block(volume_text, reference), recorded[reference],
+                f"{reference} is bound with the bytes it was recorded with",
+            )
+            self.assertIsNone(
+                recorded_decision_block(notebook, reference),
+                f"{reference} is no longer held by the living notebook",
+            )
+            self.assertIn(f"- {reference} (", notebook, f"{reference} has one summary line")
+        for reference in ("HD-105", "HD-110"):
+            self.assertIsNotNone(
+                recorded_decision_block(notebook, reference),
+                f"{reference} was recorded after the baseline and stays living",
+            )
+        audit = run_control(root, "audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
+        self.assertIn("PASS: DECISION_VOLUMES_CONSISTENT", audit.stdout)
+
+    def test_a_summary_line_quotes_the_decision_and_marks_where_it_cuts(self) -> None:
+        """B1 (second half). A summary line is a table of contents entry, not a copy: it quotes the
+        opening of the recorded fields word for word, cuts at a fixed length and marks the cut.
+        Measured on a real project, copying the fields whole produced a summary weighing 63 % of
+        the notebook it was meant to lighten."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        long_subject = "Autoriser " + ("un périmètre décrit longuement " * 12)
+        self.add_decision_line(root, "HD-101", f"Chosen option: {long_subject}")
+        path = root / "docs/governance/HUMAN_DECISIONS.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "Decision: Authorize initialization closeout and WI-000.",
+                f"Decision: {long_subject}",
+            ),
+            encoding="utf-8",
+        )
+        frozen_head = self.commit_fixture(root, "chore: a decision recorded as one very long line")
+        self.declare_legacy_baseline(root, frozen_head, "HD-105")
+        self.record_bind_decision(root, "HD-110")
+        bound = run_control(root, "decision", "bind", "--human-decision", "HD-110")
+        self.assertEqual(bound.returncode, 0, bound.stdout + bound.stderr)
+        notebook = path.read_text(encoding="utf-8")
+        line = next(value for value in notebook.splitlines() if value.startswith("- HD-101 "))
+        self.assertIn("[…]", line, "the cut is marked")
+        self.assertLess(len(line), 260, "a summary line stays a table of contents entry")
+        self.assertIn(long_subject[:60], line, "what it keeps is quoted word for word")
+        volume = (root / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md").read_text(encoding="utf-8")
+        self.assertIn(long_subject.strip(), volume, "the recorded text is kept whole in the volume")
+        shown = run_control(root, "decision", "show", "HD-101")
+        self.assertEqual(shown.returncode, 0, shown.stdout + shown.stderr)
+        self.assertIn(long_subject.strip(), shown.stdout, "and it is one command away")
+
+    def test_binding_refuses_when_a_frozen_block_changed_since_the_baseline(self) -> None:
+        """B2. A decision recorded before the baseline whose block has been rewritten since is not
+        frozen: the doctrine reads it under the current rule. Binding it would hide that, so the
+        whole binding stops and nothing is written."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        frozen_head = run_git(root, "rev-parse", "HEAD").stdout.strip()
+        self.declare_legacy_baseline(root, frozen_head, "HD-105")
+        self.add_decision_line(root, "HD-101", "Scope: rewritten after the baseline.")
+        self.commit_fixture(root, "chore: amend a decision recorded before the baseline")
+        self.record_bind_decision(root, "HD-110")
+        before = (root / "docs/governance/HUMAN_DECISIONS.md").read_text(encoding="utf-8")
+        refused = run_control(root, "decision", "bind", "--human-decision", "HD-110")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("BLOCK_CHANGED_SINCE_BASELINE", refused.stdout)
+        self.assertIn("HD-101", refused.stdout)
+        self.assertFalse((root / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md").exists(),
+                         "a refused binding writes no volume")
+        self.assertEqual((root / "docs/governance/HUMAN_DECISIONS.md").read_text(encoding="utf-8"), before,
+                         "a refused binding leaves the living notebook untouched")
+
+    def test_binding_refuses_without_a_declared_adoption_baseline(self) -> None:
+        """B2 (second refusal). Without a declared adoption baseline there is no cut line, so
+        there is nothing the controller may call frozen."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        self.record_bind_decision(root, "HD-110")
+        refused = run_control(root, "decision", "bind", "--human-decision", "HD-110")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("NO_ADOPTION_BASELINE", refused.stdout)
+        self.assertFalse((root / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md").exists())
+
+    def test_a_record_that_cites_a_bound_decision_still_resolves(self) -> None:
+        """B3. The Work Item closed before the baseline cites a decision that is now bound. The
+        records still validate, and the decision is still shown — from the volume that holds it."""
+        temporary, root, bound, _ = self.bound_project()
+        self.addCleanup(temporary.cleanup)
+        item = load_json(root / "project_control/work-items/WI-000.json")
+        self.assertIn("HD-101", item["human_decision_refs"])
+        audit = run_control(root, "audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
+        self.assertIn("PASS: SCHEMA_VALIDATION", audit.stdout)
+        shown = run_control(root, "decision", "show", "HD-101")
+        self.assertEqual(shown.returncode, 0, shown.stdout + shown.stderr)
+        self.assertIn("VOLUME: docs/governance/HUMAN_DECISIONS_VOLUME_1.md", shown.stdout)
+        self.assertIn("Authorize initialization closeout", shown.stdout)
+        living = run_control(root, "decision", "show", "HD-110")
+        self.assertEqual(living.returncode, 0, living.stdout + living.stderr)
+        self.assertIn("VOLUME: docs/governance/HUMAN_DECISIONS.md", living.stdout)
+
+    def test_the_bound_volume_leaves_the_reading_imprint_and_the_notebook_stays(self) -> None:
+        """B4. What an agent must read at start is the living notebook, summary included; the
+        bound volume is not routed, so it never enters a manifest and never expires a proof."""
+        temporary, root, _, _ = self.bound_project()
+        self.addCleanup(temporary.cleanup)
+        manifest = run_control(root, "context-manifest", "--scope", "governance")
+        self.assertEqual(manifest.returncode, 0, manifest.stdout + manifest.stderr)
+        self.assertNotIn("HUMAN_DECISIONS_VOLUME_1.md", manifest.stdout,
+                         "the bound volume is not an authority to read")
+        self.assertIn("docs/governance/HUMAN_DECISIONS.md", manifest.stdout,
+                      "the living notebook stays an authority to read")
+        routing = load_json(root / "docs/agent-governance/mandatory-documents.v1.json")
+        routed = [str(value) for value in routing.get("base", [])]
+        for documents in routing.get("scopes", {}).values():
+            routed.extend(str(value) for value in documents)
+        self.assertNotIn("docs/governance/HUMAN_DECISIONS_VOLUME_1.md", routed)
+
+    def test_the_audit_refuses_a_bound_block_that_was_changed(self) -> None:
+        """B5. The bound volume is history put aside, not history weakened: a block that no longer
+        matches its form at the adoption baseline fails the audit, and so does a summary that has
+        lost a line."""
+        temporary, root, bound, _ = self.bound_project()
+        self.addCleanup(temporary.cleanup)
+        volume = root / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md"
+        original = volume.read_text(encoding="utf-8")
+        volume.write_text(original.replace("Authorized by: Project Owner", "Authorized by: Someone else"), encoding="utf-8")
+        audit = run_control(root, "audit")
+        self.assertEqual(audit.returncode, 1, audit.stdout + audit.stderr)
+        self.assertIn("FAIL: DECISION_VOLUMES_CONSISTENT", audit.stdout)
+        self.assertIn("differ from their form at the binding origin", audit.stdout)
+        volume.write_text(original, encoding="utf-8")
+        notebook_path = root / "docs/governance/HUMAN_DECISIONS.md"
+        notebook = notebook_path.read_text(encoding="utf-8")
+        notebook_path.write_text(re.sub(r"(?m)^- HD-101 .*\n", "", notebook), encoding="utf-8")
+        missing = run_control(root, "audit")
+        self.assertEqual(missing.returncode, 1, missing.stdout + missing.stderr)
+        self.assertIn("absent from the summary", missing.stdout)
+
+    def test_a_bound_decision_keeps_the_exemption_of_frozen_history(self) -> None:
+        """B6. A decision recorded before the adoption baseline is read with the vocabulary of its
+        own time — the `Chosen option: AUTHORIZE` wording introduced later is not demanded of it.
+        Binding it must not revoke that: the exemption follows the decision into its volume."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        self.add_decision_line(root, "HD-101", "Chosen option: initialization closeout and WI-000")
+        frozen_head = self.commit_fixture(root, "chore: a decision written in its own vocabulary")
+        self.declare_legacy_baseline(root, frozen_head, "HD-105")
+        self.record_bind_decision(root, "HD-110")
+        before = run_control(root, "audit")
+        self.assertEqual(before.returncode, 0, before.stdout + before.stderr)
+        bound = run_control(root, "decision", "bind", "--human-decision", "HD-110")
+        self.assertEqual(bound.returncode, 0, bound.stdout + bound.stderr)
+        after = run_control(root, "audit")
+        self.assertEqual(after.returncode, 0, after.stdout + after.stderr)
+        self.assertIn("PASS: SCHEMA_VALIDATION", after.stdout)
+        volume = (root / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md").read_text(encoding="utf-8")
+        self.assertIn("Chosen option: initialization closeout and WI-000", volume)
+
+    def test_the_controller_says_when_there_is_something_worth_binding(self) -> None:
+        """B10. The controller reminds, and never binds by itself: a project whose frozen decisions
+        weigh at least a third of its register is told so, in both languages. The reminder appears
+        only where the action exists — once a volume is bound it gives way to the count."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        quiet = run_control(root, "status")
+        self.assertEqual(quiet.returncode, 0, quiet.stdout + quiet.stderr)
+        self.assertNotIn("decision bind", quiet.stdout, "nothing to bind, nothing to say")
+        # A register worth binding: several decisions recorded before the cut line.
+        for number in range(120, 125):
+            self.record_bind_decision(root, f"HD-{number}")
+        frozen_head = run_git(root, "rev-parse", "HEAD").stdout.strip()
+        self.declare_legacy_baseline(root, frozen_head, "HD-105")
+        reminded = run_control(root, "status")
+        self.assertEqual(reminded.returncode, 0, reminded.stdout + reminded.stderr)
+        self.assertIn("reliure possible, sous réserve de ses contrôles : decision bind", reminded.stdout)
+        state_path = root / "project_control/project-state.v1.json"
+        state = load_json(state_path)
+        state["language"] = "EN"
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        self.commit_fixture(root, "chore: the Project Owner chooses English")
+        english = run_control(root, "status")
+        self.assertEqual(english.returncode, 0, english.stdout + english.stderr)
+        self.assertIn("binding is possible, subject to its own checks: decision bind", english.stdout)
+        state["language"] = "FR"
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        self.commit_fixture(root, "chore: back to French")
+        self.record_bind_decision(root, "HD-110")
+        bound = run_control(root, "decision", "bind", "--human-decision", "HD-110")
+        self.assertEqual(bound.returncode, 0, bound.stdout + bound.stderr)
+        after = run_control(root, "status")
+        self.assertEqual(after.returncode, 0, after.stdout + after.stderr)
+        self.assertNotIn("decision bind", after.stdout, "the reminder gives way once it is done")
+        self.assertIn("reliées", after.stdout)
+
+    def test_a_project_without_a_bound_volume_behaves_as_before(self) -> None:
+        """B7. Nothing changes for a project that never bound anything: the audit says so in one
+        line and the state report gains nothing."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        audit = run_control(root, "audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
+        self.assertIn("PASS: DECISION_VOLUMES_CONSISTENT — no bound volume", audit.stdout)
+        status = run_control(root, "status")
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertNotIn("Décisions :", status.stdout)
+        self.assertNotIn("Decisions:", status.stdout)
+
+    def test_the_controller_counts_the_two_volumes_in_both_languages(self) -> None:
+        """B8. Once a volume exists the state report says how many decisions are living and how
+        many are bound — in the language the Project Owner chose. Refusals stay in English."""
+        temporary, root, bound, _ = self.bound_project()
+        self.addCleanup(temporary.cleanup)
+        french = run_control(root, "status")
+        self.assertEqual(french.returncode, 0, french.stdout + french.stderr)
+        self.assertIn(f"Décisions : 2 vivantes | {len(bound)} reliées", french.stdout)
+        state_path = root / "project_control/project-state.v1.json"
+        state = load_json(state_path)
+        state["language"] = "EN"
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        self.commit_fixture(root, "chore: the Project Owner chooses English")
+        english = run_control(root, "status")
+        self.assertEqual(english.returncode, 0, english.stdout + english.stderr)
+        self.assertIn(f"Decisions: 2 living | {len(bound)} bound", english.stdout)
+
+    def bound_project_with_uncited_decisions(self) -> tuple[tempfile.TemporaryDirectory, Path]:
+        """A bound project holding decisions that no record cites — the case the audit must see."""
+        temporary, root = self.make_normal_copy()
+        for number in range(120, 125):
+            self.record_bind_decision(root, f"HD-{number}")
+        frozen_head = run_git(root, "rev-parse", "HEAD").stdout.strip()
+        self.declare_legacy_baseline(root, frozen_head, "HD-105")
+        self.record_bind_decision(root, "HD-110")
+        bound = run_control(root, "decision", "bind", "--human-decision", "HD-110")
+        self.assertEqual(bound.returncode, 0, bound.stdout + bound.stderr)
+        return temporary, root
+
+    def test_the_audit_sees_a_bound_decision_that_nobody_cites_disappear(self) -> None:
+        """B11. Verifying that every block still present is intact leaves a decision nobody cites
+        free to vanish with its summary line: every remaining check stays satisfied. The audit
+        therefore starts from the set recorded at the binding origin, and requires each of them to
+        be somewhere — in the volume, or back in the living notebook."""
+        temporary, root = self.bound_project_with_uncited_decisions()
+        self.addCleanup(temporary.cleanup)
+        cited = {
+            reference
+            for path in sorted((root / "project_control/work-items").glob("*.json"))
+            for reference in load_json(path).get("human_decision_refs", [])
+        }
+        self.assertNotIn("HD-122", cited, "HD-122 is cited by no record at all")
+        intact = run_control(root, "audit")
+        self.assertEqual(intact.returncode, 0, intact.stdout + intact.stderr)
+        volume_path = root / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md"
+        volume = volume_path.read_text(encoding="utf-8")
+        block = recorded_decision_block(volume, "HD-122")
+        self.assertIsNotNone(block)
+        volume_path.write_text(volume.replace(f"## HD-122\n{block}", ""), encoding="utf-8")
+        notebook_path = root / "docs/governance/HUMAN_DECISIONS.md"
+        notebook_path.write_text(
+            re.sub(r"(?m)^- HD-122 .*\n", "", notebook_path.read_text(encoding="utf-8")),
+            encoding="utf-8",
+        )
+        vanished = run_control(root, "audit")
+        self.assertEqual(vanished.returncode, 1, vanished.stdout + vanished.stderr)
+        self.assertIn("FAIL: DECISION_VOLUMES_CONSISTENT", vanished.stdout)
+        self.assertIn("no longer in either volume: HD-122", vanished.stdout)
+
+    def test_the_audit_refuses_a_summary_line_that_quotes_another_decision(self) -> None:
+        """B12. A complete summary is not necessarily a faithful one: every identifier can have its
+        line while a line quotes something the decision never said. The audit rebuilds each line
+        from the bound block and compares."""
+        temporary, root, bound, _ = self.bound_project()
+        self.addCleanup(temporary.cleanup)
+        notebook_path = root / "docs/governance/HUMAN_DECISIONS.md"
+        notebook = notebook_path.read_text(encoding="utf-8")
+        line = next(value for value in notebook.splitlines() if value.startswith("- HD-101 "))
+        forged = "- HD-101 (1999-01-01) — Une phrase que la décision n'a jamais portée — REJECT"
+        notebook_path.write_text(notebook.replace(line, forged), encoding="utf-8")
+        forged_audit = run_control(root, "audit")
+        self.assertEqual(forged_audit.returncode, 1, forged_audit.stdout + forged_audit.stderr)
+        self.assertIn("summary lines do not quote the decision they name: HD-101", forged_audit.stdout)
+
+    def test_the_volume_names_its_own_origin_and_the_audit_compares_to_it(self) -> None:
+        """B13. The comparison origin is the commit written in the volume, never the baseline the
+        project declares today: a declaration may legitimately advance, and the frozen text belongs
+        to the line it was bound at. A declaration that disappears is an explicit failure, not a
+        silent substitution."""
+        temporary, root = self.bound_project_with_uncited_decisions()
+        self.addCleanup(temporary.cleanup)
+        volume = (root / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md").read_text(encoding="utf-8")
+        origin = re.search(r"(?m)^Adoption baseline:[ \t]*([0-9a-f]{40})\s*$", volume)
+        self.assertIsNotNone(origin, "the volume names the commit it was bound at")
+        state_path = root / "project_control/project-state.v1.json"
+        declared = load_json(state_path)["legacy_baseline"]["head"]
+        self.assertEqual(origin.group(1), declared)
+        # The declaration advances: the volume is still judged at its own origin.
+        status_path = root / "docs/governance/REPOSITORY_STATUS.md"
+        status_path.write_text(status_path.read_text(encoding="utf-8") + "\nUne ligne de plus.\n", encoding="utf-8")
+        later = self.commit_fixture(root, "chore: un commit après la coupe")
+        self.record_baseline_decision(root, "legacy_baseline", later, "HD-130")
+        self.commit_fixture(root, "chore: une décision qui nomme la nouvelle ligne")
+        state = load_json(state_path)
+        state["legacy_baseline"] = {"head": later, "human_decision_ref": "HD-130"}
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        self.commit_fixture(root, "chore: la baseline avance")
+        advanced = run_control(root, "audit")
+        self.assertEqual(advanced.returncode, 0, advanced.stdout + advanced.stderr)
+        self.assertIn(f"bound at {origin.group(1)[:7]}", advanced.stdout)
+        self.assertIn(f"adoption baseline now declared at {later[:7]}", advanced.stdout)
+        # The declaration disappears: explicit failure, naming the origin.
+        state["legacy_baseline"] = None
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        removed = run_control(root, "audit")
+        self.assertEqual(removed.returncode, 1, removed.stdout + removed.stderr)
+        self.assertIn(f"the volume was bound at {origin.group(1)[:7]}", removed.stdout)
+        self.assertIn("no longer declares an adoption baseline", removed.stdout)
+
+    def test_binding_creates_no_exemption_for_work_recorded_afterwards(self) -> None:
+        """B14. Three properties stay distinct: a reference found is not a reference admissible,
+        and admissible is not read. A decision written in the vocabulary of its own time keeps its
+        exemption for the Work Item frozen at the baseline — and grants nothing to a Work Item
+        created today, wherever the decision now lives."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        self.add_decision_line(root, "HD-101", "Chosen option: initialization closeout and WI-000")
+        frozen_head = self.commit_fixture(root, "chore: a decision written in its own vocabulary")
+        self.declare_legacy_baseline(root, frozen_head, "HD-105")
+        self.record_bind_decision(root, "HD-110")
+        bound = run_control(root, "decision", "bind", "--human-decision", "HD-110")
+        self.assertEqual(bound.returncode, 0, bound.stdout + bound.stderr)
+        # Found, and still exempt for the record frozen at the baseline.
+        self.assertEqual(run_control(root, "audit").returncode, 0)
+        shown = run_control(root, "decision", "show", "HD-101")
+        self.assertEqual(shown.returncode, 0, shown.stdout + shown.stderr)
+        self.assertIn("VOLUME: docs/governance/HUMAN_DECISIONS_VOLUME_1.md", shown.stdout)
+        # Found, and not admissible as the mandate of work started today.
+        refused = run_control(
+            root, "create-work-item", "WI-050", "--title", "Work that cites a bound decision",
+            "--objective", "Prove that a bound decision authorizes nothing new.",
+            "--owner", "Project Owner", "--human-decision", "HD-101",
+            "--authorized-by", "Project Owner", "--path", "reports/WI-050.txt",
+            "--conflict-gate", "INDEPENDENT", "--direct-impact", "reports/WI-050.txt",
+            "--indirect-impact", "none", "--authority-impact", "NONE",
+            "--concurrent-work-impact", "NONE", "--code", "NOT_APPLICABLE", "--tests", "APPLICABLE",
+            "--integration", "APPLICABLE", "--deployment", "NOT_APPLICABLE",
+            "--runtime-proof", "NOT_APPLICABLE", "--runtime-target", "NOT_APPLICABLE",
+            "--close-condition", "Tests and integration pass.",
+        )
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("Chosen option is not AUTHORIZE", refused.stdout)
+        self.assertFalse((root / "project_control/work-items/WI-050.json").exists())
+
+    def test_the_doctrine_describes_the_two_volumes(self) -> None:
+        """B9. A mechanism the doctrine does not carry is a mechanism nobody knows about: the core
+        doctrine and the Project Control guide name the two volumes, the cut line, and the fact
+        that binding never reconstructs nor requalifies a decision."""
+        doctrine = (ROOT / "docs/agent-governance/AGENTS.core.md").read_text(encoding="utf-8")
+        guide = (ROOT / "project_control/README.md").read_text(encoding="utf-8")
+        for expected in ("HUMAN_DECISIONS_VOLUME_1.md", "decision bind", "decision show"):
+            self.assertIn(expected, doctrine, f"the core doctrine names {expected}")
+        for expected in ("HUMAN_DECISIONS_VOLUME_1.md", "decision bind", "decision show",
+                         "DECISION_VOLUMES_CONSISTENT", "Adoption baseline:",
+                         "qu’aucune décision n’a disparu", "complet et fidèle"):
+            self.assertIn(expected, guide, f"the Project Control guide names {expected}")
+        self.assertIn("Deux volumes", doctrine, "the core doctrine has a section on the two volumes")
+        # The promise of frozen history is extended to the move, in the same words.
+        self.assertEqual(doctrine.count("reconstruites ni requalifiées"), 2,
+                         "the promise is stated for the adoption baseline and for the binding")
+
     def test_a_baseline_leaves_only_on_a_decision_that_names_the_removal(self) -> None:
         """Step 2 of the scenario the third control executed: a Work Item legitimately authorised
         to write the project state sets the adoption baseline to null and commits — an ordinary

@@ -77,6 +77,26 @@ CORE_ROOTS = (
 )
 CORE_MANIFEST_PATH = "provenance/core-manifest.v1.json"
 HUMAN_DECISIONS_PATH = "docs/governance/HUMAN_DECISIONS.md"
+# Two volumes (P19). The living notebook stays a routed authority and is read at every start;
+# the bound volume holds the decisions frozen at the adoption baseline, byte for byte. It is
+# deliberately absent from the routing: a document that is not routed never enters a manifest,
+# so an agent no longer reads it — while the controller still resolves, audits and shows it.
+DECISIONS_VOLUME_PATH = "docs/governance/HUMAN_DECISIONS_VOLUME_1.md"
+# The volume names the commit it was bound at. The audit compares against THAT commit, never
+# against whatever baseline the project declares today: a declaration can legitimately advance,
+# and a comparison origin that follows it silently would either accuse an intact volume or, worse,
+# compare frozen text to a line it never belonged to.
+DECISIONS_VOLUME_ORIGIN = re.compile(r"(?m)^Adoption baseline:[ \t]*([0-9a-f]{40})\s*$")
+DECISIONS_SUMMARY_START = "<!-- decision-volume-1:summary:start -->"
+# A summary line is a table of contents entry, so it quotes the opening of a field and marks the
+# cut. Copying a field whole defeats the purpose: measured on a real project, decisions written as
+# single long lines produced a summary weighing 63 % of the notebook it was meant to lighten — one
+# entry reached 12 212 bytes. Cutting at a fixed length changes no word and requalifies nothing;
+# the recorded text stays one command away (`decision show`).
+DECISIONS_SUMMARY_CUT = " […]"
+DECISIONS_SUMMARY_SUBJECT_LIMIT = 120
+DECISIONS_SUMMARY_OPTION_LIMIT = 60
+DECISIONS_SUMMARY_END = "<!-- decision-volume-1:summary:end -->"
 
 # Routed authorities per affected scope (P3): the scopes of a Work Item are derived from its
 # authorized paths; a path may fall into several scopes. Base authorities always apply.
@@ -304,6 +324,16 @@ SPEECH: dict[str, dict[str, str]] = {
                     "EN": "Work Items done: {done}{legacy} | Blocked: {blocked}"},
     "status.legacy": {"FR": " (dont {frozen} figés avant la baseline d'adoption)",
                       "EN": " ({frozen} of them frozen before the adoption baseline)"},
+    "status.decisions": {"FR": "Décisions : {living} vivantes | {bound} reliées — decision show HD-NNN",
+                         "EN": "Decisions: {living} living | {bound} bound — decision show HD-NNN"},
+    "status.bindable": {
+        "FR": "Décisions : {living} enregistrées, dont {frozen} figées avant la baseline d'adoption "
+              "— elles occupent {share} % du registre ; reliure possible, sous réserve de ses "
+              "contrôles : decision bind",
+        "EN": "Decisions: {living} recorded, {frozen} of them frozen before the adoption baseline "
+              "— they take up {share} % of the register; binding is possible, subject to its own "
+              "checks: decision bind",
+    },
     "status.item": {"FR": "{id} — {title} : {status}", "EN": "{id} — {title}: {status}"},
     "status.objective": {"FR": "  Objectif : {objective}", "EN": "  Objective: {objective}"},
     "status.item_branch": {"FR": "  Branche : {branch} | Cible : {target}", "EN": "  Branch: {branch} | Target: {target}"},
@@ -513,6 +543,7 @@ REPORTING_STYLE_LABELS = {
 
 ADMINISTRATIVE_EXACT_PATHS = {
     "docs/governance/HUMAN_DECISIONS.md",
+    DECISIONS_VOLUME_PATH,
     "docs/governance/ROADMAP.md",
     "docs/governance/roadmap-state.v1.json",
     "docs/governance/WORKTREE_REGISTRY.md",
@@ -634,7 +665,7 @@ _ADMINISTRATIVE_LOCK: dict[str, Any] = {"handle": None, "depth": 0}
 # lost each other's work.
 MUTATING_COMMANDS = frozenset({
     "create-work-item", "start", "block", "resume", "close", "acknowledge-authorities",
-    "idea", "install-gate",
+    "idea", "install-gate", "decision",
 })
 # These write only when asked to; a read-only invocation must never wait behind a writer.
 CONDITIONALLY_MUTATING = {
@@ -970,6 +1001,80 @@ def decision_block(text: str, reference: str) -> str | None:
         text,
     )
     return None if match is None else match.group(1)
+
+
+def decision_references(text: str) -> list[str]:
+    """Every Human Decision reference recorded in a text, in order of appearance."""
+    return re.findall(r"(?m)^## (HD-[0-9]{3,})\s*$", text)
+
+
+def quoted_opening(value: str, limit: int) -> str:
+    """The opening of a recorded field, cut at `limit` characters and marked when it is cut."""
+    cleaned = value.strip()
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[:limit].rstrip() + DECISIONS_SUMMARY_CUT
+
+
+def decisions_summary_line(reference: str, block: str) -> str:
+    """One summary line for a bound decision: number, date, subject, chosen option.
+
+    Every part is quoted from the record, word for word, and cut at a fixed length when it is
+    longer — the cut is marked. Nothing is reformulated, reordered or requalified: the summary
+    is a table of contents, and the recorded text is one `decision show` away."""
+    def field(name: str, limit: int) -> str:
+        found = re.search(rf"(?m)^{name}:[ \t]*(\S.*)$", block)
+        return quoted_opening(found.group(1), limit) if found else "UNKNOWN"
+    return (
+        f"- {reference} ({field('Date', 40)})"
+        f" — {field('Decision', DECISIONS_SUMMARY_SUBJECT_LIMIT)}"
+        f" — {field('Chosen option', DECISIONS_SUMMARY_OPTION_LIMIT)}"
+    )
+
+
+def render_decisions_summary(entries: Sequence[tuple[str, str]]) -> str:
+    """The summary block inserted in the living notebook, between its two markers.
+
+    No `## HD-NNN` heading appears inside it: the summary lists decisions, it does not hold
+    them, and nothing here may be mistaken for a recorded decision."""
+    lines = [
+        DECISIONS_SUMMARY_START,
+        "",
+        "## Sommaire du volume relié 1",
+        "",
+        f"Les {len(entries)} décisions ci-dessous sont figées et conservées, texte intégral et",
+        f"inchangé, dans `{DECISIONS_VOLUME_PATH}`. Chaque ligne cite le début de la décision,",
+        f"mot pour mot, coupé à {DECISIONS_SUMMARY_SUBJECT_LIMIT} caractères et marqué par",
+        f"« {DECISIONS_SUMMARY_CUT.strip()} ».",
+        "",
+        "**Ces lignes sont des repères, pas des décisions.** Une ligne coupée ne dit pas ce qui",
+        "vient après : une réserve, une négation ou un refus peuvent s'y trouver. Seul le texte",
+        "conservé énonce le choix humain, et il s'ouvre au besoin : `decision show HD-NNN`.",
+        "",
+    ]
+    lines.extend(decisions_summary_line(reference, block) for reference, block in entries)
+    lines.extend(["", DECISIONS_SUMMARY_END, ""])
+    return "\n".join(lines)
+
+
+def strip_decisions_summary(text: str) -> str:
+    """The text without its summary block — what the notebook held before the binding."""
+    return re.sub(
+        rf"{re.escape(DECISIONS_SUMMARY_START)}.*?{re.escape(DECISIONS_SUMMARY_END)}\n?",
+        "",
+        text,
+        flags=re.S,
+    )
+
+
+def decisions_summary_entries(text: str) -> list[str]:
+    """The references listed by a summary block, in order."""
+    found = re.search(
+        rf"{re.escape(DECISIONS_SUMMARY_START)}(.*?){re.escape(DECISIONS_SUMMARY_END)}",
+        text,
+        flags=re.S,
+    )
+    return re.findall(r"(?m)^- (HD-[0-9]{3,}) ", found.group(1)) if found else []
 
 
 def human_decision_errors(text: str, reference: str, *, as_mandate: bool = True) -> list[str]:
@@ -1919,6 +2024,7 @@ class ProjectControl:
         self.roadmap_json = self.root / "docs/governance/roadmap-state.v1.json"
         self.roadmap_md = self.root / "docs/governance/ROADMAP.md"
         self.human_decisions = self.root / HUMAN_DECISIONS_PATH
+        self.decisions_volume = self.root / DECISIONS_VOLUME_PATH
         self.worktree_registry = self.root / "docs/governance/WORKTREE_REGISTRY.md"
         self.classifications_path = self.root / "docs/governance/git-path-classifications.v1.json"
         self.routing_json = self.root / "docs/agent-governance/mandatory-documents.v1.json"
@@ -2093,6 +2199,9 @@ class ProjectControl:
         add(findings, "LEGACY_EVIDENCE_FROZEN", not legacy_frozen, legacy_summary if not legacy_frozen else "; ".join(legacy_frozen))
         authorities_summary, authorities_errors = self.authorities_baseline_audit()
         add(findings, "AUTHORITIES_BASELINE", not authorities_errors, authorities_summary if not authorities_errors else "; ".join(authorities_errors))
+        volumes_summary, volumes_errors = self.decision_volumes_audit()
+        add(findings, "DECISION_VOLUMES_CONSISTENT", not volumes_errors,
+            volumes_summary if not volumes_errors else "; ".join(volumes_errors))
         language = self.language()
         language_ok = language in LANGUAGES or (language == "UNKNOWN" and self.operating_mode() == "BOOTSTRAP_MODE")
         add(findings, "LANGUAGE", language_ok,
@@ -2214,7 +2323,7 @@ class ProjectControl:
             return [] if value in roadmap_ids else [f"{idea_id}: target {value} is not in the roadmap"]
         if HUMAN_DECISION_ID.fullmatch(value):
             try:
-                text = self.human_decisions.read_text(encoding="utf-8")
+                text = self.decisions_text()
             except OSError as exc:
                 return [f"{idea_id}: cannot read Human Decisions: {exc}"]
             return [] if human_decision_field(text, value, "Decision") is not None else [f"{idea_id}: target {value} is not recorded"]
@@ -2522,7 +2631,7 @@ class ProjectControl:
 
     def human_decision_entries(self) -> list[dict[str, str]]:
         try:
-            text = self.human_decisions.read_text(encoding="utf-8")
+            text = self.decisions_text()
         except OSError:
             return []
         entries = []
@@ -3017,7 +3126,7 @@ class ProjectControl:
             return errors
         errors.extend(self.agent_run_authority_errors(agent_runs))
         try:
-            decisions = self.human_decisions.read_text(encoding="utf-8")
+            decisions = self.decisions_text()
         except OSError as exc:
             return errors + [str(exc)]
         try:
@@ -3237,7 +3346,7 @@ class ProjectControl:
             errors.append(str(exc))
         try:
             state = self.project_state()
-            decisions_text = self.human_decisions.read_text(encoding="utf-8")
+            decisions_text = self.decisions_text()
             charter = (self.root / "docs/governance/PROJECT_CHARTER.md").read_text(encoding="utf-8")
             architecture = (self.root / "docs/architecture/PROJECT_ARCHITECTURE_MAP.md").read_text(encoding="utf-8")
             initial_architecture = (self.root / "docs/architecture/INITIAL_ARCHITECTURE.md").read_text(encoding="utf-8")
@@ -4552,7 +4661,7 @@ class ProjectControl:
             raise ProjectControlError(
                 f"{action} requires a new Human Decision for {item.get('work_item_id')}"
             )
-        decisions_text = self.human_decisions.read_text(encoding="utf-8")
+        decisions_text = self.decisions_text()
         decision_errors = human_decision_errors(decisions_text, decision_ref)
         if decision_errors:
             raise ProjectControlError(
@@ -4769,7 +4878,7 @@ class ProjectControl:
         if any(record.get("branch") == branch for record in records.values()):
             raise ProjectControlError(f"branch is already declared by another Work Item: {branch}")
 
-        decisions_text = self.human_decisions.read_text(encoding="utf-8")
+        decisions_text = self.decisions_text()
         decision_exists = bool(re.search(rf"(?m)^## {re.escape(decision_ref)}\s*$", decisions_text))
         if not decision_exists and not args.decision:
             raise ProjectControlError(
@@ -4881,9 +4990,13 @@ class ProjectControl:
                     f"Related Work Item: {work_item_id}\n"
                     f"Authorized by: {authorized_by}\n"
                 )
+                # A new decision is always recorded in the living notebook. `decisions_text`
+                # above may carry both volumes, so the file is rewritten from its own content:
+                # a binding must never be undone by a creation.
+                living_text = self.human_decisions.read_text(encoding="utf-8")
                 transaction.write_text(
-                    "docs/governance/HUMAN_DECISIONS.md",
-                    decisions_text.rstrip() + "\n" + decision_block,
+                    HUMAN_DECISIONS_PATH,
+                    living_text.rstrip() + "\n" + decision_block,
                 )
             transaction.write_json(conversation_path, conversation)
             transaction.write_json(item_path, item)
@@ -5610,13 +5723,357 @@ class ProjectControl:
         ):
             raise ProjectControlError(f"legacy baseline {head} is missing or not in current history")
         try:
-            decisions_text = self.human_decisions.read_text(encoding="utf-8")
+            decisions_text = self.decisions_text()
         except OSError as exc:
             raise ProjectControlError(f"cannot read Human Decisions: {exc}") from exc
         if not HUMAN_DECISION_ID.fullmatch(decision) or not human_decision_is_valid(decisions_text, decision, as_mandate=False):
             raise ProjectControlError(f"legacy baseline requires a recorded Human Decision: {decision}")
         self.require_baseline_named(decisions_text, "legacy_baseline", head, decision)
         return head, decision
+
+    def decision_volumes_audit(self) -> tuple[str, list[str]]:
+        """Summary and errors for the two volumes; fail closed.
+
+        A bound volume is history put aside, not history weakened. Three promises are checked,
+        and the first is the one that matters: **nothing has disappeared**. Verifying that every
+        block still present is intact would leave a decision nobody cites free to vanish with its
+        summary line — every remaining check would stay satisfied. So the audit starts from the
+        set of decisions recorded at the commit the volume was bound at, and requires each of them
+        to be somewhere: in the volume, or back in the living notebook.
+
+        Then: every bound block is identical to its form at that commit, and every summary line is
+        the line the controller would write today for the decision it names — a complete summary
+        is not necessarily a faithful one.
+
+        The comparison origin is the commit written in the volume, not the baseline the project
+        declares today. A declaration may legitimately advance; the frozen text belongs to the
+        line it was bound at.
+        """
+        if not self.decisions_volume.is_file():
+            return "no bound volume; the Human Decisions register is a single living notebook", []
+        errors: list[str] = []
+        try:
+            living = self.human_decisions.read_text(encoding="utf-8")
+            volume = self.decisions_volume.read_text(encoding="utf-8")
+        except OSError as exc:
+            return "bound volume unreadable", [str(exc)]
+        bound = decision_references(volume)
+        living_refs = decision_references(living)
+        summary = "; ".join([
+            f"{len(living_refs)} living decision(s)",
+            f"{len(bound)} bound in {DECISIONS_VOLUME_PATH}",
+        ])
+        if not bound:
+            errors.append(f"{DECISIONS_VOLUME_PATH} records no Human Decision")
+        duplicates = sorted(set(bound) & set(living_refs))
+        if duplicates:
+            errors.append(f"recorded in both volumes: {', '.join(duplicates)}")
+        repeated = sorted({ref for ref in bound if bound.count(ref) > 1})
+        if repeated:
+            errors.append(f"recorded twice in the bound volume: {', '.join(repeated)}")
+
+        # The origin, read from the volume itself.
+        pinned = DECISIONS_VOLUME_ORIGIN.search(volume)
+        if pinned is None:
+            return summary, [
+                *errors,
+                f"{DECISIONS_VOLUME_PATH} does not name the commit it was bound at "
+                "(`Adoption baseline: <40-character commit>`)",
+            ]
+        origin = pinned.group(1)
+        summary += f"; bound at {origin[:7]}"
+        shown = self.run_git(["show", f"{origin}:{HUMAN_DECISIONS_PATH}"])
+        if shown.returncode != 0:
+            return summary, [
+                *errors,
+                f"cannot read {HUMAN_DECISIONS_PATH} at the binding origin {origin}: "
+                "the comparison term is unavailable",
+            ]
+        recorded_text = shown.stdout
+        expected = decision_references(recorded_text)
+
+        # The declaration of today is reported, never substituted for the origin.
+        try:
+            declared = self.legacy_baseline()
+        except ProjectControlError as exc:
+            declared = None
+            errors.append(f"adoption baseline declaration unusable: {exc}")
+        if declared is None:
+            errors.append(
+                f"the volume was bound at {origin[:7]}; the project no longer declares an adoption baseline"
+            )
+        elif declared[0] != origin:
+            summary += f"; adoption baseline now declared at {declared[0][:7]}"
+
+        # 1. Nothing has disappeared: every decision recorded at the origin is still somewhere.
+        held = set(bound) | set(living_refs)
+        vanished = [reference for reference in expected if reference not in held]
+        if vanished:
+            errors.append(
+                "recorded at the binding origin and no longer in either volume: "
+                + ", ".join(sorted(vanished))
+            )
+        posterior = [reference for reference in bound if reference not in set(expected)]
+        if posterior:
+            errors.append(
+                f"bound but not recorded at the binding origin {origin[:7]}: {', '.join(sorted(posterior))}"
+            )
+
+        # 2. Every bound block is identical to its form at the origin.
+        altered = []
+        for reference in bound:
+            if reference not in set(expected):
+                continue
+            original = decision_block(recorded_text, reference)
+            current = decision_block(volume, reference)
+            if original is None or current is None or original.strip() != current.strip():
+                altered.append(reference)
+        if altered:
+            errors.append(
+                "bound blocks differ from their form at the binding origin: " + ", ".join(sorted(altered))
+            )
+
+        # 3. The summary is complete AND faithful: one line per bound decision, and each line is
+        #    the line the controller would write today for the decision it names.
+        listed = decisions_summary_entries(living)
+        missing = [reference for reference in bound if reference not in listed]
+        if missing:
+            errors.append(f"absent from the summary in {HUMAN_DECISIONS_PATH}: {', '.join(sorted(missing))}")
+        extra = [reference for reference in listed if reference not in set(bound)]
+        if extra:
+            errors.append(f"listed in the summary but not bound: {', '.join(sorted(extra))}")
+        counted = sorted({reference for reference in listed if listed.count(reference) > 1})
+        if counted:
+            errors.append(f"listed more than once in the summary: {', '.join(counted)}")
+        written = {
+            reference: line
+            for line in living.splitlines()
+            if line.startswith("- HD-")
+            for reference in [line.split(" ", 2)[1]]
+        }
+        unfaithful = []
+        for reference in bound:
+            block = decision_block(volume, reference)
+            if block is None or reference not in written:
+                continue
+            if written[reference] != decisions_summary_line(reference, block):
+                unfaithful.append(reference)
+        if unfaithful:
+            errors.append(
+                "summary lines do not quote the decision they name: " + ", ".join(sorted(unfaithful))
+            )
+        return summary, errors
+
+    def bind_decisions(self, args: argparse.Namespace) -> dict[str, Any]:
+        """Bind the decisions frozen at the adoption baseline into volume 1 (P19).
+
+        The cut moves text and changes nothing else. Every bound block keeps the bytes it had,
+        the living notebook gains one summary line per bound decision, and the controller goes
+        on resolving every reference in both volumes. The command refuses rather than repair:
+        a single block that no longer matches its form at the baseline, or a single reference
+        that would stop resolving, stops the whole binding and writes nothing."""
+        if self.operating_mode() != "NORMAL_MODE":
+            raise ProjectControlError("decision bind is available only in NORMAL_MODE")
+        if self.decisions_volume.is_file():
+            raise ProjectControlError(
+                f"{DECISIONS_VOLUME_PATH} already exists; binding again is a human decision, not a repetition"
+            )
+        decision_ref = args.human_decision.upper()
+        if not HUMAN_DECISION_ID.fullmatch(decision_ref):
+            raise ProjectControlError("--human-decision must be HD-NNN")
+        decisions = self.decisions_text()
+        mandate_errors = human_decision_errors(decisions, decision_ref)
+        if mandate_errors:
+            raise ProjectControlError("decision bind refused (HUMAN_AUTHORIZATION): " + "; ".join(mandate_errors))
+        at_baseline = self.decisions_at_baseline()
+        if at_baseline is None:
+            raise ProjectControlError(
+                "decision bind refused (NO_ADOPTION_BASELINE): the project declares no adoption baseline"
+            )
+        commit, recorded_text = at_baseline
+        living = self.human_decisions.read_text(encoding="utf-8")
+        frozen = self.frozen_decision_refs()
+        recorded_refs = decision_references(recorded_text)
+        # A decision recorded at the baseline whose block has changed since is not frozen: the
+        # doctrine reads it under the current rule, and binding it would hide that.
+        altered = [ref for ref in recorded_refs if ref not in frozen]
+        if altered:
+            raise ProjectControlError(
+                "decision bind refused (BLOCK_CHANGED_SINCE_BASELINE): "
+                + ", ".join(altered)
+                + f" differ from their form at {commit[:7]}"
+            )
+        bound = [ref for ref in decision_references(living) if ref in frozen]
+        if not bound:
+            raise ProjectControlError(
+                "decision bind refused (NOTHING_TO_BIND): no frozen decision is recorded in the living notebook"
+            )
+        blocks: list[tuple[str, str]] = []
+        for reference in bound:
+            block = decision_block(living, reference)
+            if block is None:  # pragma: no cover - bound comes from this very text
+                raise ProjectControlError(f"decision bind refused: {reference} is not recorded")
+            blocks.append((reference, block))
+        volume = "".join([
+            "# Human Decisions — Volume relié 1\n\n",
+            f"Adoption baseline: {commit}\n\n",
+            f"Décisions figées par la baseline d'adoption `{commit}` et reliées le {today_iso()} ",
+            f"sous `{decision_ref}`.\n\n",
+            "Le texte de chaque décision est celui qui a été enregistré, à l'octet près. Aucune ",
+            "décision n'est ici réécrite, résumée ni requalifiée. Ce volume n'est pas une autorité ",
+            "routée : il ne se lit pas au démarrage d'un chantier, il se consulte — ",
+            "`decision show HD-NNN`.\n\n",
+            *(f"## {reference}\n{block}" for reference, block in blocks),
+        ])
+        remaining = [ref for ref in decision_references(living) if ref not in set(bound)]
+        header = living.split("## " + decision_references(living)[0], 1)[0].rstrip() + "\n\n"
+        notebook = "".join([
+            strip_decisions_summary(header),
+            render_decisions_summary(blocks),
+            "\n",
+            *(f"## {reference}\n{decision_block(living, reference)}" for reference in remaining),
+        ])
+        # Nothing is written before the result is proved equivalent: same bytes for every bound
+        # block, every reference still resolving, no decision in two volumes, none lost.
+        union = notebook + "\n" + volume
+        for reference, block in blocks:
+            if decision_block(volume, reference) != block:
+                raise ProjectControlError(f"decision bind refused (TEXT_WOULD_CHANGE): {reference}")
+        before = set(decision_references(living))
+        after = set(decision_references(notebook)) | set(decision_references(volume))
+        if before != after:
+            raise ProjectControlError(
+                "decision bind refused (DECISION_WOULD_BE_LOST): "
+                + ", ".join(sorted(before ^ after))
+            )
+        if set(decision_references(notebook)) & set(decision_references(volume)):
+            raise ProjectControlError("decision bind refused (RECORDED_TWICE)")
+        unresolved = sorted({
+            str(reference)
+            for item in self.records("project_control/work-items")
+            for reference in item.get("human_decision_refs", [])
+            if decision_block(union, str(reference)) is None
+        })
+        if unresolved:
+            raise ProjectControlError(
+                "decision bind refused (REFERENCES_WOULD_BREAK): " + ", ".join(unresolved)
+            )
+        self.validate_clean_administrative_baseline()
+        canonical_branch, _ = self.require_canonical_checkout("decision bind")
+        self.require_clean_worktree("decision bind")
+        transaction = FileTransaction(self.root)
+        committed: tuple[str, str] | None = None
+        try:
+            transaction.write_text(DECISIONS_VOLUME_PATH, volume)
+            transaction.write_text(HUMAN_DECISIONS_PATH, notebook)
+            summary, errors = self.decision_volumes_audit()
+            if errors:
+                raise ProjectControlError("decision bind refused: " + "; ".join(errors))
+            record_errors = self.project_control_errors()
+            if record_errors:
+                raise ProjectControlError("decision bind refused: " + "; ".join(record_errors))
+            committed = self.commit_records(
+                transaction,
+                f"chore(project-control): bind {len(bound)} frozen Human Decision(s) into volume 1 ({decision_ref})",
+            )
+            transaction.commit()
+        except BaseException as exc:
+            if committed is not None:
+                rollback_errors = self.uncommit_records(transaction, str(canonical_branch), *committed)
+                if rollback_errors:
+                    raise ProjectControlError(
+                        f"decision bind failed: {exc}; ROLLBACK FAILED: {'; '.join(rollback_errors)}"
+                    ) from exc
+            else:
+                transaction.rollback()
+            raise
+        return {"bound": bound, "baseline": commit, "decision": decision_ref, "summary": summary}
+
+    def show_decision(self, reference: str) -> tuple[str, str]:
+        """(volume, recorded text) for one Human Decision — read-only, either volume."""
+        if not HUMAN_DECISION_ID.fullmatch(reference):
+            raise ProjectControlError("decision show expects HD-NNN")
+        living = self.human_decisions.read_text(encoding="utf-8")
+        block = decision_block(living, reference)
+        if block is not None:
+            return HUMAN_DECISIONS_PATH, block
+        if self.decisions_volume.is_file():
+            block = decision_block(self.decisions_volume.read_text(encoding="utf-8"), reference)
+            if block is not None:
+                return DECISIONS_VOLUME_PATH, block
+        raise ProjectControlError(f"{reference} is not recorded in either volume")
+
+    def decisions_text(self) -> str:
+        """Every recorded Human Decision, whichever volume holds it.
+
+        The living notebook is what an agent reads at start; the bound volume is history the
+        controller still resolves, audits and shows. Reading both costs the controller one file
+        read and costs the agent nothing — the bound volume is not routed, so it never enters a
+        manifest. Nothing is ever written through this accessor: a new decision goes to the
+        living notebook, and only `decision bind` writes the volume."""
+        living = self.human_decisions.read_text(encoding="utf-8")
+        if not self.decisions_volume.is_file():
+            return living
+        return living + "\n" + self.decisions_volume.read_text(encoding="utf-8")
+
+    def bindable_decisions(self) -> tuple[int, int] | None:
+        """(frozen decisions, their share of the register in percent) when binding is worth it.
+
+        The controller reminds; it never binds by itself. Moving governance text without a human
+        decision is exactly what this skeleton forbids everywhere else, so the reminder appears
+        only where the action exists — no volume yet, a declared adoption baseline, and frozen
+        decisions weighing at least a third of the register, the Project Owner's own threshold.
+
+        The quantity measured here is the **gross share of the register held by frozen blocks**,
+        not the net saving: the summary that replaces them keeps a little room, so the reminder
+        announces a potential, never a guaranteed third. The three conditions do not include the
+        integrity checks `decision bind` runs, so the command may still refuse — for instance when
+        a frozen block has been rewritten since the baseline. The reminder says so.
+
+        A register that grows again after a first binding is a known debt: binding a second time
+        means moving the cut line, which is a decision and a mechanism this version does not
+        build."""
+        if self.decisions_volume.is_file():
+            return None
+        try:
+            living = self.human_decisions.read_text(encoding="utf-8")
+            frozen = self.frozen_decision_refs()
+        except (ProjectControlError, OSError):
+            return None
+        if not frozen:
+            return None
+        weight = sum(
+            len((decision_block(living, reference) or "").encode("utf-8")) for reference in frozen
+        )
+        total = len(living.encode("utf-8"))
+        if not total or weight * 3 < total:
+            return None
+        return len(frozen), round(100 * weight / total)
+
+    def bound_decision_refs(self) -> list[str]:
+        """The decisions held by the bound volume — empty when the project never bound any."""
+        if not self.decisions_volume.is_file():
+            return []
+        return decision_references(self.decisions_volume.read_text(encoding="utf-8"))
+
+    def living_decision_refs(self) -> list[str]:
+        """The decisions still recorded in the living notebook."""
+        return decision_references(self.human_decisions.read_text(encoding="utf-8"))
+
+    def decisions_at_baseline(self) -> tuple[str, str] | None:
+        """(commit, text of the notebook at the adoption baseline), or None without a baseline."""
+        try:
+            baseline = self.legacy_baseline()
+        except ProjectControlError:
+            return None
+        if baseline is None:
+            return None
+        shown = self.run_git(["show", f"{baseline[0]}:{HUMAN_DECISIONS_PATH}"])
+        if shown.returncode != 0:
+            raise ProjectControlError(
+                f"cannot read {HUMAN_DECISIONS_PATH} at the adoption baseline {baseline[0]}"
+            )
+        return baseline[0], shown.stdout
 
     def frozen_decision_refs(self) -> set[str]:
         """Human Decisions recorded at the adoption baseline whose text has not changed since.
@@ -5650,7 +6107,7 @@ class ProjectControl:
                 f"cannot read {HUMAN_DECISIONS_PATH} at the adoption baseline {baseline[0]}"
             )
         try:
-            current_text = self.human_decisions.read_text(encoding="utf-8")
+            current_text = self.decisions_text()
         except OSError as exc:
             raise ProjectControlError(f"cannot read Human Decisions: {exc}") from exc
         frozen: set[str] = set()
@@ -5682,7 +6139,7 @@ class ProjectControl:
         ):
             raise ProjectControlError(f"authorities baseline {head} is missing or not in current history")
         try:
-            decisions_text = self.human_decisions.read_text(encoding="utf-8")
+            decisions_text = self.decisions_text()
         except OSError as exc:
             raise ProjectControlError(f"cannot read Human Decisions: {exc}") from exc
         if not HUMAN_DECISION_ID.fullmatch(decision) or not human_decision_is_valid(decisions_text, decision, as_mandate=False):
@@ -5944,7 +6401,7 @@ class ProjectControl:
             raise ProjectControlError(f"{work_item_id} is not closable from status {item.get('status')}")
         # A closure is an act of today, like create-work-item, block and resume: it reads its
         # mandate in full. Nothing frozen exempts it — a recorded refusal never closes anything.
-        decisions_text = self.human_decisions.read_text(encoding="utf-8")
+        decisions_text = self.decisions_text()
         refs = item.get("human_decision_refs", [])
         mandate_errors = [error for ref in refs for error in human_decision_errors(decisions_text, str(ref))]
         if not refs or mandate_errors:
@@ -6089,7 +6546,7 @@ class ProjectControl:
         add(findings, "WORK_ITEM_AUTHORIZED", item.get("status") in PREFLIGHT_STATUSES, f"status={item.get('status')}")
         add(findings, "CONFLICT_GATE", item.get("conflict_gate") in {"INDEPENDENT", "DEPENDENT"}, f"classification={item.get('conflict_gate')}")
         refs = item.get("human_decision_refs", [])
-        decisions_text = self.human_decisions.read_text(encoding="utf-8")
+        decisions_text = self.decisions_text()
         decision_errors = [error for ref in refs for error in human_decision_errors(decisions_text, ref)]
         add(
             findings,
@@ -6341,6 +6798,21 @@ def command_main(argv: Sequence[str] | None = None) -> int:
     idea_add.add_argument("--stated-at", dest="stated_at", help="YYYY-MM-DD; defaults to today.")
     idea_add.add_argument("--target", help="WI-NNN, version or HD-NNN carrying the idea, when known.")
     idea_add.add_argument("--note", help="What the idea became, in one line.")
+    decision = subparsers.add_parser(
+        "decision",
+        help="Two volumes: bind the decisions frozen at the adoption baseline, or show one of them.",
+    )
+    decision_commands = decision.add_subparsers(dest="decision_command", required=True)
+    decision_bind = decision_commands.add_parser(
+        "bind",
+        help="Move the decisions frozen at the adoption baseline into volume 1, leaving one summary line each.",
+    )
+    decision_bind.add_argument(
+        "--human-decision", dest="human_decision", required=True,
+        help="HD-NNN authorizing the binding (recorded, with Folder scope and both confirmations if it leaves the folder).",
+    )
+    decision_show = decision_commands.add_parser("show", help="Print one recorded Human Decision, from either volume.")
+    decision_show.add_argument("reference", help="HD-NNN")
     idea_set = idea_commands.add_parser("set", help="Change the state, target or note of an idea.")
     idea_set.add_argument("idea_id", help="ID-NNN")
     idea_set.add_argument("--state", choices=IDEA_STATES)
@@ -6382,6 +6854,38 @@ def command_main(argv: Sequence[str] | None = None) -> int:
             return lifecycle_report("idea", "FAIL", control.repository_context(), getattr(args, "idea_id", "ID-NEW").upper(), str(exc), label="IDEA_ID")
         committed = "committed on the canonical branch" if control.operating_mode() == "NORMAL_MODE" else "written (Bootstrap Mode: commit it with the initialization)"
         return lifecycle_report("idea", "PASS", control.repository_context(), idea_id, f"idea recorded in ideas-state.v1.json and IDEAS.md, {committed}", label="IDEA_ID")
+    if args.command == "decision":
+        if args.decision_command == "show":
+            try:
+                volume, block = control.show_decision(args.reference.upper())
+            except (ProjectControlError, OSError) as exc:
+                findings_show: list[Finding] = []
+                add(findings_show, "DECISION_SHOW", False, str(exc))
+                return report("decision", findings_show, context)
+            print(f"PROJECT_CONTROL: PASS")
+            print("READ_ONLY: true")
+            print("COMMAND: decision show")
+            print(f"DECISION: {args.reference.upper()}")
+            print(f"VOLUME: {volume}")
+            print(f"BRANCH: {context['branch']}")
+            print(f"HEAD: {context['head']}")
+            print(f"## {args.reference.upper()}")
+            print(block.rstrip())
+            return 0
+        try:
+            bound = control.bind_decisions(args)
+        except (ProjectControlError, OSError, json.JSONDecodeError) as exc:
+            return lifecycle_report(
+                "decision bind", "FAIL", control.repository_context(),
+                args.human_decision.upper(), str(exc), label="HUMAN_DECISION",
+            )
+        return lifecycle_report(
+            "decision bind", "PASS", control.repository_context(), bound["decision"],
+            f"{len(bound['bound'])} decision(s) bound into {DECISIONS_VOLUME_PATH} "
+            f"at the adoption baseline {bound['baseline'][:7]}, summary written in {HUMAN_DECISIONS_PATH}, "
+            "committed on the canonical branch",
+            label="HUMAN_DECISION",
+        )
     if args.command == "context-manifest":
         scopes = list(args.scope)
         label = "NO_WORK_ITEM"
@@ -6457,6 +6961,17 @@ def command_main(argv: Sequence[str] | None = None) -> int:
             legacy = speak(tongue, "status.legacy", frozen=frozen) if frozen else ""
             line("status.done", done=done, legacy=legacy,
                  blocked=sum(item["status"] == "BLOCKED" for item in items))
+            # Only when a volume exists: a project that never bound anything sees the output it
+            # has always seen.
+            bound_refs = control.bound_decision_refs()
+            if bound_refs:
+                line("status.decisions", living=len(control.living_decision_refs()), bound=len(bound_refs))
+            else:
+                bindable = control.bindable_decisions()
+                if bindable is not None:
+                    frozen, share = bindable
+                    line("status.bindable", living=len(control.living_decision_refs()),
+                         frozen=frozen, share=share)
             for item in items:
                 if item["status"] in {"DONE", "REJECTED", "SUPERSEDED"}:
                     continue

@@ -34,7 +34,7 @@ Langue : non choisie (UNKNOWN) — à fixer avec le Project Owner / not chosen y
 Branche : main | HEAD : <commit>
 Contrôles : PASS
 Garde-fou de commit : installé hors de l'arbre de travail
-Squelette : 3.19.2 | core aligné
+Squelette : 3.20.0 | core aligné
 Vue roadmap : absente — roadmap-view --write
 Travaux terminés : 0 | Bloqués : 0
 Prochaine action : Initialiser le projet avec FIRST_START.md et valider le périmètre avec le propriétaire.
@@ -51,7 +51,7 @@ READ_ONLY: true
 COMMAND: bootstrap-audit
 BRANCH: main
 HEAD: <commit>
-… 25 controls PASS …
+… 26 controls PASS …
 
 $ python3 -B scripts/project_control.py bootstrap-preflight --path modules/hello/greeting.py
 PROJECT_CONTROL: FAIL
@@ -59,7 +59,7 @@ READ_ONLY: true
 COMMAND: bootstrap-preflight
 BRANCH: main
 HEAD: <commit>
-… 22 controls PASS …
+… 23 controls PASS …
 FAIL: BOOTSTRAP_CHANGE_SCOPE — bootstrap-forbidden path: modules/hello/greeting.py
 … 2 controls PASS …
 [exit 1]
@@ -70,7 +70,7 @@ READ_ONLY: true
 COMMAND: bootstrap-preflight
 BRANCH: main
 HEAD: <commit>
-… 25 controls PASS …
+… 26 controls PASS …
 ```
 
 ## 3. The Project Owner answers the interview; the agent records the answers
@@ -84,7 +84,7 @@ READ_ONLY: true
 COMMAND: bootstrap-audit
 BRANCH: main
 HEAD: <commit>
-… 25 controls PASS …
+… 26 controls PASS …
 
 $ git add -- <the interview records, explicitly>
 
@@ -106,7 +106,7 @@ READ_ONLY: true
 COMMAND: bootstrap-closeout
 BRANCH: main
 HEAD: <commit>
-… 26 controls PASS …
+… 27 controls PASS …
 ```
 
 `INITIALIZATION_STATUS` goes to `COMPLETE` in FIRST_START.md and in Project State together, WI-000 is closed, and the transition is committed explicitly. From now on the canonical branch only accepts administrative records, reports and provenance: this transition commit is the one the hook lets through only under an explicit human mandate, echoed in the transcript.
@@ -128,7 +128,7 @@ READ_ONLY: true
 COMMAND: audit
 BRANCH: main
 HEAD: <commit>
-… 22 controls PASS …
+… 23 controls PASS …
 
 $ python3 -B scripts/project_control.py status
 Project: Hello Squelette | NORMAL_MODE
@@ -137,7 +137,7 @@ Language: english (EN)
 Branch: main | HEAD: <commit>
 Checks: PASS
 Commit gate: installed outside the worktree
-Skeleton: 3.19.2 | core aligned
+Skeleton: 3.20.0 | core aligned
 Roadmap view: absent — roadmap-view --write
 Work Items done: 1 | Blocked: 0
 Next action: Project at rest; wait for an authorized objective.
@@ -206,7 +206,7 @@ Language: english (EN)
 Branch: work/wi-001-greeting | HEAD: <commit>
 Checks: PASS
 Commit gate: installed outside the worktree
-Skeleton: 3.19.2 | core aligned
+Skeleton: 3.20.0 | core aligned
 Roadmap view: absent — roadmap-view --write
 Work Items done: 1 | Blocked: 0
 WI-001 — Greeting module: IN_PROGRESS
@@ -231,7 +231,7 @@ COMMAND: preflight
 WORK_ITEM_ID: WI-001
 BRANCH: work/wi-001-greeting
 HEAD: <commit>
-… 17 controls PASS …
+… 18 controls PASS …
 FAIL: BUSINESS_CHANGE_AUTHORIZATION — path outside Work Item authorization: modules/billing/invoice.py
 … 18 controls PASS …
 FAIL: AUTHORIZED_PATHS — path outside Work Item authorization: modules/billing/invoice.py
@@ -253,7 +253,7 @@ COMMAND: preflight
 WORK_ITEM_ID: WI-001
 BRANCH: work/wi-001-greeting
 HEAD: <commit>
-… 40 controls PASS …
+… 41 controls PASS …
 ```
 
 ## 7. Work, tests, integration
@@ -322,7 +322,7 @@ Language: english (EN)
 Branch: main | HEAD: <commit>
 Checks: PASS
 Commit gate: installed outside the worktree
-Skeleton: 3.19.2 | core aligned
+Skeleton: 3.20.0 | core aligned
 Roadmap view: current
 Work Items done: 2 | Blocked: 0
 Next action: Project at rest; wait for an authorized objective.
@@ -333,7 +333,7 @@ READ_ONLY: true
 COMMAND: audit
 BRANCH: main
 HEAD: <commit>
-… 22 controls PASS …
+… 23 controls PASS …
 
 $ git log --oneline --graph
 * <sha> chore(project-control): roadmap view

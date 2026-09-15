@@ -756,6 +756,50 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   elle passera donc directement en `3.19.2` — puis le rafraîchissement du miroir public anonymisé,
   chacun sous son propre double arrêt.
 
+## Décisions du Project Owner — 2026-09-15
+
+- `TPL-D-073` — **Le registre des décisions se coupe en deux volumes.** Depuis la `3.6.0`, un
+  chantier ne démarre qu'après lecture réelle des autorités routées, et `HUMAN_DECISIONS.md` en
+  fait partie pour tous les chantiers : il est relu **en entier** à chaque `start`, chaque
+  `resume` et chaque `acknowledge-authorities`, et il ne fait que grossir. Mesure de phase 0, en
+  lecture seule, sur une copie du squelette et un clone jetable d'Alpha
+  (`provenance/maintenance/2026-09-15-rapport-mesure-phase-0-p19.md`) : dans un projet réel, le
+  registre pèse **63 %** de tout ce qui doit être lu avant d'écrire une ligne, et **69 % de ce
+  registre** est figé par la baseline d'adoption — 64 décisions sur 85, inchangées depuis. La
+  coupe retire **environ 30 400 jetons à chaque démarrage**, soit 41 % du total. La coupe a été
+  **appliquée pour de vrai** dans le clone jetable avant d'écrire une ligne de code : trois
+  contrôles cèdent (`SCHEMA_VALIDATION`, `INITIALIZATION_STATE`, `GIT_TRACEABILITY`), tous
+  réparables dans le contrôleur, **aucun record à réécrire** — 62 références se cassent avec une
+  coupe naïve et se résolvent toutes dès que le contrôleur lit les deux volumes, l'exemption des
+  décisions figées étant retrouvée à 64 sur 64. Décision : « Je donne mon accord pour construire »
+  (2026-09-15), avec le nom des commandes tranché — « deux mots : `decision bind` /
+  `decision show` » — sur le modèle d'`idea add` / `idea set` : un seul mot entre au vocabulaire.
+  Quatre points tranchés avec elle : la ligne de coupe est la baseline d'adoption **déjà
+  déclarée**, sans troisième objet ; le texte déplacé est identique **à l'octet près** et la
+  promesse « jamais reconstruites ni requalifiées » s'étend au déplacement ; un projet qui n'a
+  rien relié se comporte exactement comme avant ; et la reliure périodique n'est pas construite —
+  relier de nouveau restera une décision humaine. Hors périmètre, à sa demande explicite :
+  l'application de la coupe dans Alpha, qui attendra **la clôture de son chantier en
+  cours** en plus de la promotion et d'un double arrêt propre (« Alpha est en pause sur un chantier
+  en cours ! Il serait judicieux d'attendre la fin du chantier avant de faire des modifications
+  dedans »). Dette écrite et non tranchée : le journal des décisions du squelette lui-même
+  (`provenance/CHANGELOG.md`, 196 249 octets) n'est routé nulle part — normal pour un moule, ou
+  trou ; la question revient après le lot 2. Construction sur `claude/v3.20-deux-volumes`, version
+  `3.20.0` ; la promotion reste une décision séparée.
+
+- `TPL-D-074` — **Promotion de la `3.20.0`.** « Promouvoir » (2026-09-15), après la relecture
+  indépendante du cadrage, sa contre-vérification (`P19_REVIEW_OF_CADRAGE_PASS`, aucun constat
+  rejeté, ligne rouge majeure fermée) et la livraison de la branche dans l'atelier sous double
+  arrêt (« Confirmé : branche claude/v3.20-deux-volumes dans ~/Projets/Squelette V3
+  -runtime-proof, main intouché, pas de tag, pas de push. »), vérifiée depuis une copie de lecture :
+  181 essais verts, audit, bootstrap-audit, traçabilité et démo PASS. `claude/v3.20-deux-volumes`
+  est promue branche canonique par fast-forward de `main` ; la baseline promue reçoit le tag
+  `v3.20.0`, posé sur le commit qui enregistre cette décision ; la vue est régénérée ensuite et
+  committée à part, si bien que `main` est un commit devant le tag. L'envoi vers `origin` et vers
+  le NAS, la release GitHub et le rafraîchissement du miroir public restent les gestes du Project
+  Owner (`TPL-D-004`). L'application de la coupe dans Alpha attend, à sa demande, la
+  clôture de son chantier en cours, puis un double arrêt propre.
+
 ## Décisions du Project Owner — 2026-09-10 (suite 10)
 
 - `TPL-D-051` — **Deux des trois constats de la troisième passe de contrôle (3.17.0).** La troisième
@@ -768,6 +812,122 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   d'abord** `F-08`, la baseline défigeable, qui demande d'ancrer une déclaration à la décision qui
   la nomme, donc de toucher au format des décisions, alors qu'Alpha en a deux
   déclarées. La promotion reste une décision séparée.
+
+## 2026-09-15 — `claude/v3.20-deux-volumes` — le carnet vivant et le volume relié
+
+- Mandat : `TPL-D-073`. Double arrêt : `STOP 1` (dossier cible, action, alternative : mesurer
+  depuis l'atelier en lecture seule et rendre le rapport dans la discussion) → « Recopie l'atelier
+  et va en avant ! » ; `STOP 2` (périmètre exact reformulé) → « Confirmé : dossier de chantier
+  ~/Projets/squelette-chantier-p19, copie de l'atelier sans les liens GitHub et NAS,
+  atelier et Alpha lus seulement, aucun envoi, aucune suppression. »
+- Baseline : `main` à `19b24cf` (`v3.19.2`, plus la vue régénérée).
+- Phase 0, en lecture seule, avant toute écriture : rapport
+  `provenance/maintenance/2026-09-15-rapport-mesure-phase-0-p19.md`, verdict
+  `P19_MEASURE_PASS_BUILD_MAY_START`, aucun des trois blocages prévus déclenché. Fiche de cadrage
+  V2 : `provenance/maintenance/scopes/p19-scope-deux-volumes.md`.
+- **Le constat.** Le registre des décisions est le premier poste de l'empreinte de lecture d'un
+  projet réel (63 %, 64 % et 47 % selon la forme d'autorisation), et 69 % de son contenu est figé
+  par la baseline d'adoption.
+- **Ce qui est livré.** Le registre peut être coupé en deux à la ligne que le projet déclare
+  déjà. `docs/governance/HUMAN_DECISIONS.md` reste l'autorité routée et reçoit un sommaire — une
+  ligne par décision reliée, entre deux marqueurs, avec le numéro, la date, `Decision` et la
+  première ligne de `Chosen option` recopiées telles quelles.
+  `docs/governance/HUMAN_DECISIONS_VOLUME_1.md` garde les décisions figées **à l'octet près** et
+  n'est routé nulle part : il n'entre dans aucun manifeste, donc un agent ne le lit plus, tandis
+  que le contrôleur continue d'y résoudre, d'y auditer et d'y afficher chaque décision.
+- **La surface de changement.** Les onze lectures du registre passaient déjà par un seul point ;
+  elles passent désormais par un accesseur unique qui rend le carnet vivant, plus le volume relié
+  quand il existe — `REUSE`, pas `REIMPLEMENT`. Les écritures, elles, visent toujours le seul
+  carnet vivant : `create-work-item` n'écrit jamais dans un volume.
+- **La coupe est un geste du contrôleur.** `decision bind --human-decision HD-NNN` s'exécute
+  depuis la canonique, sur un worktree propre, exige une décision humaine valide comme mandat, et
+  committe lui-même le résultat. Cinq refus, sans rien écrire : `NO_ADOPTION_BASELINE`,
+  `BLOCK_CHANGED_SINCE_BASELINE` (un bloc figé réécrit depuis la baseline repasse sous la règle
+  courante et ne peut pas être relié), `NOTHING_TO_BIND`, `REFERENCES_WOULD_BREAK`, et un volume
+  déjà présent. Avant d'écrire, la commande prouve le résultat : mêmes octets pour chaque bloc,
+  aucune décision perdue, aucune dans deux volumes, aucune référence qui cesse de se résoudre.
+  Réversible par Git. `decision show HD-NNN` est en lecture seule et nomme le volume qui porte la
+  décision.
+- **Ce que le contrôleur vérifie.** `DECISION_VOLUMES_CONSISTENT` : chaque bloc relié identique à
+  sa forme à la baseline d'adoption, exactement une ligne de sommaire par décision reliée, aucune
+  décision dans les deux volumes, aucune décision postérieure à la ligne de coupe reliée.
+- **Ce qui ne change pas.** Sans volume, le contrôle passe en une ligne, `status` n'ajoute rien et
+  la sortie est celle de la `3.19.2`. L'exemption de vocabulaire des décisions figées suit la
+  décision dans son volume — sans quoi les cinq décisions d'Alpha écrites avant la
+  règle de la `3.10.0` feraient de nouveau échouer son audit, exactement comme le 9 septembre.
+- **Doctrine** : section « Deux volumes » dans `AGENTS.core.md` et dans
+  `project_control/README.md`.
+- Seize essais, chacun vérifié **rouge** sur la `3.19.2` d'origine et **vert** après : la coupe et
+  l'intégrité des octets, les deux refus, la résolution d'un record ancien, l'empreinte de
+  lecture, l'audit sur un bloc relié modifié et sur un sommaire amputé, l'exemption des décisions
+  figées, le projet sans volume, les deux langues, la doctrine, la ligne de sommaire qui cite en marquant sa coupe, le rappel dans les deux langues, et les quatre essais nés de la relecture indépendante. 181 essais au total.
+- **Le sommaire cite et marque sa coupe** (amendement 1 de la fiche). La fiche demandait de
+  recopier la première ligne de chaque champ *telle quelle* ; appliquée au vrai journal de
+  Alpha, dans un clone jetable, cette règle produit un sommaire de **97 438 octets, 63 %
+  du carnet vivant qu'il est censé alléger**, une ligne atteignant 12 212 octets — le gain tombe à
+  17 % et le chantier passe sous son propre seuil d'utilité. Dans un projet réel, `Decision` et
+  `Chosen option` sont des paragraphes écrits sur une seule ligne, pas des titres. La ligne de
+  sommaire **cite** donc le début de chaque champ, mot pour mot, et **marque sa coupe** (`Decision`
+  à 120 caractères, `Chosen option` à 60, puis `[…]`) : aucun mot changé, rien de reformulé ni de
+  requalifié, et le texte enregistré reste à une commande de distance. Un essai le démontre.
+- **Répétition sur le vrai journal**, dans un clone jetable d'Alpha (`main`,
+  `229c9c8`), cœur `3.20.0` posé, décision de reliure fictive marquée comme telle. Le rappel
+  s'affiche de lui-même : « 86 enregistrées, dont 64 figées — elles occupent 69 % du registre ».
+  La coupe relie **64 décisions sur 86**, le carnet vivant passe de **186 333 à 69 168 octets**,
+  le volume nomme son origine (`Adoption baseline: d4d7b5a…`), l'empreinte de lecture d'un
+  chantier métier tombe de **294 143 à 188 885 octets (−35,8 %, environ 26 300 jetons de moins à
+  chaque démarrage)**, et l'audit rend **23 PASS, 0 FAIL** — avant comme après la coupe. L'écart
+  avec la projection de la phase 0 (−37,8 %) vient de ce chantier lui-même : la doctrine des deux
+  volumes a allongé deux documents du cœur, qui sont eux-mêmes des autorités lues. Aucune écriture
+  dans le dépôt réel : il n'a été que lu.
+- **Le contrôleur rappelle, il ne relie jamais seul** (amendement 2 de la fiche, « Je valide le
+  rappel ! »). Tant qu'aucun volume n'existe, qu'une baseline d'adoption est déclarée et que les
+  décisions figées pèsent **au moins un tiers** du registre — le seuil d'utilité du Project Owner
+  lui-même — `status` le dit en une ligne, en français et en anglais, et nomme la commande. Une
+  fois la reliure faite, cette ligne cède la place au décompte des deux volumes. Le rappel
+  n'apparaît **que là où la commande existe** : après une première reliure, `decision bind` refuse,
+  et signaler « il serait temps de relier à nouveau » désignerait une porte qui ne s'ouvre pas. La
+  voie automatique est écartée — déplacer du texte de gouvernance sans décision humaine contredit
+  tout le reste du squelette.
+- **Deux dettes écrites** dans la feuille de route, à sa demande (« Question 3 : on écrit comme
+  dette ! ») : le journal du squelette lui-même n'est routé nulle part, donc un chantier sur le
+  squelette n'est pas tenu de le lire — normal pour un moule, ou trou, rien n'est tranché, et le
+  rendre obligatoire coûterait environ 49 000 jetons par chantier ; et relier une seconde fois,
+  quand le carnet vivant a regrossi, demanderait de déplacer la ligne de coupe, ce que cette
+  version ne construit pas.
+- **Relecture indépendante du cadrage, et ses corrections.** Une relecture indépendante de la
+  fiche a rendu `P19_CADRAGE_REQUIRES_MAJOR_REDLINE` avec neuf constats. Contre-vérification :
+  `provenance/maintenance/2026-09-15-contre-revue-cadrage-p19.md`, verdict
+  `P19_REVIEW_OF_CADRAGE_PASS` — **aucun constat rejeté**, sept retenus et traités, deux établis
+  comme n'étant pas des défauts du code (le relecteur n'avait que la fiche, et le disait).
+  - **R-01, la ligne rouge majeure, était fondée et est reproduite.** Le contrôle vérifiait que
+    chaque bloc *retrouvé* était intact, sans jamais partir du compte de départ : une décision
+    reliée que **personne ne cite** pouvait être retirée du volume avec sa ligne de sommaire, et
+    tous les contrôles restaient verts. Le volume nomme désormais le commit auquel il a été relié
+    (`Adoption baseline:`), et le contrôle exige que chaque décision enregistrée à cette origine
+    soit encore quelque part. Ce trou **existait déjà avant les deux volumes** — supprimer du
+    registre une décision que personne ne cite passait aussi l'audit en `3.19.2` ; la correction
+    ferme les deux cas.
+  - **R-02**, reproduit : une ligne de sommaire pouvait porter le bon numéro et citer autre chose.
+    Chaque ligne est maintenant reconstruite depuis le bloc relié et comparée littéralement.
+  - **R-03**, moitié confirmé : le retrait de la déclaration était déjà un échec explicite, mais
+    un **avancement légitime** de la baseline faisait accuser le volume à tort. L'origine épinglée
+    règle les deux : un avancement est signalé, un retrait et une origine illisible échouent en le
+    nommant.
+  - **R-04 à R-06**, retenus, corrigés dans les textes : le sommaire dit qu'il est un repère et
+    non une décision — une ligne coupée ne dit pas ce qui suit ; le rappel nomme la grandeur qu'il
+    mesure (part brute des blocs figés, pas économie nette) et annonce un potentiel sous réserve
+    des contrôles de la commande, qui peut refuser.
+  - **R-07, R-08, R-09** : absents de la fiche, présents dans le code — la reliure est une
+    transaction ordinaire et un refus ne laisse pas de demi-reliure ; les bornes d'un bloc vont du
+    titre au titre suivant ou à la fin du fichier ; et vivre dans un volume ne crée aucune
+    exemption, vérifié en essayant de créer un chantier qui cite une décision reliée : refusé.
+    Tout est désormais écrit dans la doctrine.
+  - Quatre essais de plus, chacun rouge sur la `3.19.2` **et** sur la `3.20.0` d'avant correction,
+    vert après. **181 essais au total.**
+- Au passage, constaté pendant la mesure : le bloc « maintenant » de la feuille de route, saisi à
+  la main et non régénéré, annonçait la `3.19.1`, Alpha en `3.18.1` et 164 essais.
+  Corrigé (`5b1204c`).
 
 ## 2026-09-12 — `claude/v3.19.2-reprise-sous-garde-fou` — ce que le prochain commit portera vraiment
 

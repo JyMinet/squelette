@@ -1,26 +1,26 @@
-<!-- ROADMAP_VIEW sources_digest=1e642d8ab38a52c0826dda663f66a28a33d63dc048db015399407c2fe202d970 generated_at=2026-09-12T21:20:21Z head=ef7b8e2acb6c0a5399e9a9d028401f58812926c8 -->
+<!-- ROADMAP_VIEW sources_digest=a34ab5c671b4b6cccea4c19cb66f1fcfd8341a8594f87e381254cc018118eda2 generated_at=2026-09-15T09:52:11Z head=6a733ea1700a0575623e4441a899ffb1f7a7c640 -->
 # ROADMAP SQUELETTE
 
 Vue générée par `roadmap-view` depuis les fichiers du projet ; elle montre, elle ne décide rien. Ne pas éditer à la main : relancer la commande.
 
 ## Vérification
 
-- Vérifié le : 12 sept. 2026, 21:20 UTC
+- Vérifié le : 15 sept. 2026, 09:52 UTC
 - Comment : le dossier du projet a été lu par le contrôleur, sans rien y modifier
 - Version : 3.19.2, la dernière promue — le commit courant n’est pas tagué
-- Sauvegardes : en retard : origin, nas
-- Vérifications : les contrôles du dossier passent · 165 essais automatiques présents, non exécutés par cette vue
+- Sauvegardes : aucune sauvegarde distante connue
+- Vérifications : les contrôles du dossier passent · 181 essais automatiques présents, non exécutés par cette vue
 - Mise à jour : chaque jour ; à la demande dans la discussion ROADMAP
 
 ## Maintenant
 
-- La version 3.19.2 est la dernière promue ; le dossier n’est pas sur elle. _(source : dossier du squelette (tags))_
-- Des sauvegardes distantes sont en retard sur la branche principale : origin, nas. _(source : dossier du squelette (remotes))_
+- La version 3.19.2 est la dernière promue ; la 3.20.0 se prépare. _(source : dossier du squelette (tags))_
+- Aucune sauvegarde distante n’est connue depuis ce dossier. _(source : dossier du squelette (remotes))_
 - Les contrôles du dossier passent tous ; les essais automatiques, eux, ne sont pas exécutés par cette vue. _(source : contrôleur, audit du dossier)_
-- Aucune branche de travail ouverte : tout est intégré. _(source : dossier du squelette (branches))_
-- Le squelette est en 3.19.1 ; Alpha en 3.18.1 (montée du 11 septembre, WI-066), ses deux baselines confirmées par décision (HD-074, HD-075) et la protection de son passé ancrée. Non vérifié par ce tableau : il ne regarde que le squelette. _(source : journal du squelette (TPL-D-057, TPL-D-059, TPL-D-065) ; décisions HD-074 à HD-077 d'Alpha)_
-- Cinq passes de contrôle indépendant depuis le 10 septembre : vingt et un défauts démontrés, tous corrigés avec leur essai. La cinquième a trouvé que le rangement des copies jetables de la 3.18.2 pouvait effacer le worktree d'un autre, et qu'un nom accentué échappait à la règle de contenu des fusions — fermés en 3.19.1. Reste une contre-vérification ciblée de ces six corrections, puis une pause sans nouvelle règle. Le squelette est public depuis le 11 septembre : JyMinet/squelette, première version 3.19.1, miroir anonymisé du dépôt privé. _(source : rapports sous provenance/maintenance/ ; journal du squelette (TPL-D-059, TPL-D-065))_
-- 164 essais, chacun né d'un défaut démontré ou d'un usage réel. Deux projets réels vivent sur le squelette en plus du template : Alpha, adopté avec son histoire figée, et « Coût moyen crypto », né gouverné. _(source : journal du squelette ; note de test du 9 sept.)_
+- Branches de travail non intégrées : claude/v3.20-deux-volumes. _(source : dossier du squelette (branches))_
+- Le squelette est en 3.19.2 ; Alpha aussi, monté le 12 septembre sous HD-084 / WI-071, ses deux baselines confirmées par décision (HD-074, HD-075) et la protection de son passé ancrée. Non vérifié par ce tableau : il ne regarde que le squelette. _(source : journal du squelette (TPL-D-057, TPL-D-059, TPL-D-065, TPL-D-070, TPL-D-072) ; décisions HD-074 à HD-084 d'Alpha)_
+- Cinq passes de contrôle indépendant depuis le 10 septembre : vingt et un défauts démontrés, tous corrigés avec leur essai. La cinquième a trouvé que le rangement des copies jetables de la 3.18.2 pouvait effacer le worktree d'un autre, et qu'un nom accentué échappait à la règle de contenu des fusions — fermés en 3.19.1. La revue de cadrage de « la question de l'existant » a ensuite fait apparaître un défaut de reprise, corrigé en 3.19.2. Le squelette est public depuis le 11 septembre : JyMinet/squelette, miroir anonymisé du dépôt privé, rafraîchi en 3.19.2. _(source : rapports sous provenance/maintenance/ ; journal du squelette (TPL-D-059, TPL-D-065))_
+- 165 essais, chacun né d'un défaut démontré ou d'un usage réel. Deux projets réels vivent sur le squelette en plus du template : Alpha, adopté avec son histoire figée, et « Coût moyen crypto », né gouverné. _(source : journal du squelette ; note de test du 9 sept.)_
 
 ## Ce qui t’attend
 
@@ -51,6 +51,8 @@ Vue générée par `roadmap-view` depuis les fichiers du projet ; elle montre, e
 - Publication, étape 2 (dépôt public, annonce) et extension Claude (plugin) — après un second vrai projet
 - Documents de gouvernance en anglais (P14, étape 2)
 - Corriger `idea add` dans le squelette lui-même (O-15)
+- Dette : le journal des décisions du squelette lui-même n'est obligatoire pour personne
+- Dette : relier une seconde fois, quand le carnet vivant a regrossi
 
 ## Tes idées, et ce qu’elles sont devenues
 
@@ -78,6 +80,7 @@ Vue générée par `roadmap-view` depuis les fichiers du projet ; elle montre, e
 | 2026-09-08 | « on veut donner la possibilité que le squelette parle anglais et français ! Faut rajouter l'anglais ! Choix de l'utilisateur ! » | Même principe que le style de retour : la langue est un choix du Project Owner, pas une décision de l'agent. Périmètre tranché le 8 sept. : ce que l'IA dit au Project Owner — messages du contrôleur (situation, refus, audits) et vue roadmap ; les documents de gouvernance, les commits, les tags et le journal restent en français. Le choix se fait par une question à l'initialisation, enregistrée dans le projet ; en changer sera une décision humaine. Les documents de gouvernance en anglais sont prévus pour plus tard (étape 2). Chantier P14, à cadrer puis à livrer. | à régler | discussion « vitrine GitHub », 8 sept. |
 | 2026-09-09 | « Ok pour la concurrence ! » | Deux agents qui travaillent en même temps sur le même dépôt : jamais essayé. À cadrer comme une revue ou comme un chantier. | évoquée | discussion squelette, 9 sept. |
 | 2026-09-09 | « j'ai d'autres projets plus ou moins aboutis, essayer squelette sur un projet déjà lancé est-il ok ? » | La seconde revue a établi la limite : un dépôt jamais gouverné n'a pas de procédure d'import, et l'initialisation refuse le code métier déjà présent sous applications/, modules/ ou shared/. Un projet dont le code est ailleurs passe. À cadrer : ouvrir une vraie voie d'adoption. | évoquée | discussion squelette, 9 sept. |
+| 2026-09-14 | « Perso je chercherai à concevoir un outil qui fait en sorte qu'on ne surcharge pas l'IA et donc on évite d'avoir des coûts qui s'envolent. Nettoyage des fichiers quand on n'en a plus besoin dans la conversation, propose une nouvelle conversation quand cela est utile. » | Trois lots : les deux volumes (livré en 3.20.0), le paquet de chantier, le ménage à la clôture. Les deux derniers restent à cadrer. → P19 | en cours | discussion squelette, 14 sept. |
 
 ## Les chantiers du squelette
 
@@ -101,6 +104,7 @@ Vue générée par `roadmap-view` depuis les fichiers du projet ; elle montre, e
 | P16 | Le garde-fou de commit | Fait | Trois façons démontrées de faire entrer dans l'historique un commit que l'audit aurait refusé, trouvées par la seconde passe de contrôle indépendant. Lots A et B livrés en 3.16.1 : le garde-fou est installé là où Git le cherche vraiment, et un état indexé illisible est refusé au lieu d'être accepté sur le seul audit du disque. Lot C livré en 3.16.2 : la vérification des fusions lit l'index, ce que le commit emporte, et non le dossier de travail, d'où un fichier hors périmètre pouvait disparaître. Les cinq constats de la seconde passe sont traités ; reste une troisième passe de contrôle. | fiche de cadrage dans le dossier |
 | P17 | L'histoire figée qui peut être défigée | Fait | La troisième passe de contrôle a montré qu'un chantier autorisé sur l'état du projet pouvait retirer la baseline d'adoption, modifier une clôture figée, puis redéclarer la baseline sur le commit réécrit en citant la vieille décision — par la voie normale. Quatre questions tranchées par le Project Owner. Livré en 3.18.0 : une décision qui déclare une baseline nomme son commit ; retirer une baseline exige une décision qui le dit ; une baseline ne recule jamais ; et toute montée de version est répétée sur un worktree jetable avec l'audit du nouveau contrôleur avant d'être écrite. Alpha a confirmé ses deux baselines et adopté la 3.18.0 le jour même. La quatrième passe de contrôle a trouvé la porte restée ouverte — le résultat d'une fusion édité avant son commit — et trois anomalies modérées ; la 3.18.1 les ferme toutes. | fiche de cadrage dans le dossier |
 | P18 | Publication : le squelette sait se publier | Partiel | Le dépôt public sera un miroir produit par un script depuis le dépôt privé, jamais édité à la main : l'arbre suivi à un tag, l'adresse retirée, les chemins de la machine neutralisés, le projet adopté renommé « Alpha », le dépôt de sauvegarde anonymisé, le prénom conservé, les rapports de contrôle gardés et marqués comme copies. Le script refuse de finir s'il reste un mot interdit et ne touche jamais au core. Livré en 3.19.0 : le script, son essai, la fiche. Reste : la publication elle-même (dépôt public à nommer, première version publique en 4.0.0 après la cinquième passe), le rendu public comme geste du Project Owner. | fiche de cadrage dans le dossier |
+| P19 | Deux volumes : le carnet vivant et le volume relié | Fait | Le registre des décisions est relu en entier à chaque démarrage de chantier et ne fait que grossir. Mesuré sur un projet réel avant d'écrire une ligne : il pèse 63 % de tout ce qu'un agent doit lire avant d'écrire, et 69 % de son contenu est figé par la baseline d'adoption. La coupe a été appliquée pour de vrai sur une copie jetable pour voir ce qui cède : trois contrôles, tous réparables dans l'outil, aucun enregistrement ancien à réécrire. Livré en 3.20.0 : le registre se coupe en deux à la ligne que le projet déclare déjà. Le carnet vivant reste l'autorité lue à chaque départ et reçoit un sommaire d'une ligne par décision reliée ; le volume relié garde le texte figé à l'octet près, sort de la lecture obligatoire et s'ouvre à la demande. Environ 30 400 jetons de moins à chaque démarrage. Sans volume, rien ne change. Reste au Project Owner : l'appliquer à ses projets, après la promotion et la clôture du chantier en cours d'Alpha. Une relecture indépendante du cadrage a rendu une ligne rouge majeure, fondée et reproduite : le contrôle vérifiait que tout ce qu'il retrouvait était en ordre sans jamais compter ce qui devait être là, si bien qu'une décision que personne ne cite pouvait disparaître sans que rien ne le voie. Corrigée, avec trois autres corrections et quatre essais de plus ; aucun des neuf constats n'a été rejeté. | fiche de cadrage dans le dossier |
 
 ## Ce qui est derrière nous
 
@@ -214,14 +218,13 @@ Vue générée par `roadmap-view` depuis les fichiers du projet ; elle montre, e
 
 ## Pour les techniciens
 
-- généré le 2026-09-12T21:20:21Z · style PLAIN · rôle PROJECT_TEMPLATE
-- branch `main` · HEAD `ef7b8e2acb6c0a5399e9a9d028401f58812926c8` · tag `none`
-- audit PASS · skeleton 3.19.2 · core aligné · hook INSTALLED
-- remotes: `origin` `ebf62f4f46da2a1c5f02f57abd997482033148d2` · `nas` `ebf62f4f46da2a1c5f02f57abd997482033148d2`
-- fiches de cadrage: P1 `provenance/maintenance/scopes/p1-consolidation-baseline-unique.md` · P2 `provenance/maintenance/scopes/p2-scope-template-upgrade.md` · P3 `provenance/maintenance/scopes/p3-scope-preuve-lecture-autorites.md` · P4 `provenance/maintenance/scopes/p4-scope-capability-adversarial-review.md` · P6 `provenance/maintenance/scopes/p12-scope-roadmap-dediee.md` · P7 `provenance/maintenance/scopes/p7-scope-question-de-l-existant.md` · P9 `provenance/maintenance/scopes/p9-scope-records-administratifs-et-branches.md` · P10 `provenance/maintenance/scopes/p10-scope-publication-vitrine-github.md` · P11 `provenance/maintenance/scopes/p11-scope-style-de-retour.md` · P12 `provenance/maintenance/scopes/p12-scope-roadmap-dediee.md` · P13 `provenance/maintenance/scopes/mandat-codex-revue-robustesse-squelette-3.9.0.md` · P14 `provenance/maintenance/scopes/p14-scope-langue-au-choix.md` · P15 `provenance/maintenance/scopes/p15-scope-amorcage-outille.md` · P16 `provenance/maintenance/scopes/p16-scope-garde-fou-de-commit.md` · P17 `provenance/maintenance/scopes/p17-scope-baseline-defigeable.md` · P18 `provenance/maintenance/scopes/p18-scope-publication.md`
-- sources_digest `1e642d8ab38a52c0826dda663f66a28a33d63dc048db015399407c2fe202d970`
-- `provenance/CHANGELOG.md` sha256=`f4ae1aed649b7ba64a3f13f0b36e3e4bb2331ec290b04d8205522ac093217cb0`
-- `provenance/core-manifest.v1.json` sha256=`d41f406cff779a6016c173847953211961946a78638894d63a039df43ccb6419`
-- `provenance/roadmap-template.v1.json` sha256=`5bf6482396ab86abf699cffec69b1191560ec221a26d04922d7d790c6869838b`
+- généré le 2026-09-15T09:52:11Z · style PLAIN · rôle PROJECT_TEMPLATE
+- branch `claude/v3.20-deux-volumes` · HEAD `6a733ea1700a0575623e4441a899ffb1f7a7c640` · tag `none`
+- audit PASS · skeleton 3.20.0 · core aligné · hook INSTALLED
+- fiches de cadrage: P1 `provenance/maintenance/scopes/p1-consolidation-baseline-unique.md` · P2 `provenance/maintenance/scopes/p2-scope-template-upgrade.md` · P3 `provenance/maintenance/scopes/p3-scope-preuve-lecture-autorites.md` · P4 `provenance/maintenance/scopes/p4-scope-capability-adversarial-review.md` · P6 `provenance/maintenance/scopes/p12-scope-roadmap-dediee.md` · P7 `provenance/maintenance/scopes/p7-scope-question-de-l-existant.md` · P9 `provenance/maintenance/scopes/p9-scope-records-administratifs-et-branches.md` · P10 `provenance/maintenance/scopes/p10-scope-publication-vitrine-github.md` · P11 `provenance/maintenance/scopes/p11-scope-style-de-retour.md` · P12 `provenance/maintenance/scopes/p12-scope-roadmap-dediee.md` · P13 `provenance/maintenance/scopes/mandat-codex-revue-robustesse-squelette-3.9.0.md` · P14 `provenance/maintenance/scopes/p14-scope-langue-au-choix.md` · P15 `provenance/maintenance/scopes/p15-scope-amorcage-outille.md` · P16 `provenance/maintenance/scopes/p16-scope-garde-fou-de-commit.md` · P17 `provenance/maintenance/scopes/p17-scope-baseline-defigeable.md` · P18 `provenance/maintenance/scopes/p18-scope-publication.md` · P19 `provenance/maintenance/scopes/p19-scope-deux-volumes.md`
+- sources_digest `a34ab5c671b4b6cccea4c19cb66f1fcfd8341a8594f87e381254cc018118eda2`
+- `provenance/CHANGELOG.md` sha256=`d2b9856febbcdfe9be4b285b62a6d97ebe0832bb5210f98d9eaacbb45773f679`
+- `provenance/core-manifest.v1.json` sha256=`22669cfd659d347e85ff79d34df3f0cac0aa3198a2816b5addc401d8e51d39f7`
+- `provenance/roadmap-template.v1.json` sha256=`7bc1c22300efb4265327b5f65c458e3645e5fd04b2ba5d27a50eb73901d3cd1f`
 - `provenance/roadmap-view.v1.json` sha256=`e882d6fd32842655e80204edbbf0a4721a60e1cd31b5b1abb5cda00b25f2a0ea`
 - `(versions taguées du dépôt)` sha256=`c174f07f4bb14879b61b17c541372cbd45d47aa31f46945f479c6b3db0cdae94`
