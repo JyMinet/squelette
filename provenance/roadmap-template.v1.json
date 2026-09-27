@@ -316,6 +316,15 @@
         "TPL-D-076",
         "TPL-D-077"
       ]
+    },
+    {
+      "version": "3.20.2",
+      "date": "2026-09-27",
+      "label": "la fausse nouvelle version repart de registres vierges",
+      "decisions": [
+        "TPL-D-078",
+        "TPL-D-079"
+      ]
     }
   ],
   "next_version": null,
@@ -593,9 +602,9 @@
   ],
   "now": [
     {
-      "text": "Le squelette est en 3.20.1, promue le 27 septembre : elle corrige la suite d'essais pour les projets qui ont relié leur volume de décisions. Alpha est en 3.20.0 depuis le 20 septembre (HD-088 / WI-074) et a relié son volume 1 le même jour (HD-089) ; c'est cette reliure qui a fait apparaître le défaut, à la clôture de WI-081 le 27 septembre. Il montera en 3.20.1 sous son propre double arrêt. Non vérifié par ce tableau : il ne regarde que le squelette.",
+      "text": "Le squelette est en 3.20.2, promue le 27 septembre au soir : deux correctifs de la suite d'essais pour les projets dérivés (3.20.1 : la copie d'essai repart de registres vierges ; 3.20.2 : la fausse « nouvelle version » des essais de montée aussi). Alpha est en 3.20.0 depuis le 20 septembre (HD-088 / WI-074), volume 1 relié le même jour (HD-089) ; sa montée, répétée sur copie jetable, ira directement en 3.20.2 sous son propre double arrêt. Non vérifié par ce tableau : il ne regarde que le squelette.",
       "tone": "good",
-      "source": "journal du squelette (TPL-D-072, TPL-D-074, TPL-D-076, TPL-D-077) ; brief du Project Owner du 27 septembre (décisions HD-088, HD-089 et chantier WI-081 d'Alpha)"
+      "source": "journal du squelette (TPL-D-076 à TPL-D-079) ; brief du Project Owner du 27 septembre (décisions HD-088, HD-089 et chantier WI-081 d'Alpha)"
     },
     {
       "text": "Cinq passes de contrôle indépendant depuis le 10 septembre : vingt et un défauts démontrés, tous corrigés avec leur essai. La cinquième a trouvé que le rangement des copies jetables de la 3.18.2 pouvait effacer le worktree d'un autre, et qu'un nom accentué échappait à la règle de contenu des fusions — fermés en 3.19.1. La revue de cadrage de « la question de l'existant » a ensuite fait apparaître un défaut de reprise, corrigé en 3.19.2. Le squelette est public depuis le 11 septembre : JyMinet/squelette, miroir anonymisé du dépôt privé, rafraîchi en 3.19.2.",
@@ -603,16 +612,16 @@
       "source": "rapports sous provenance/maintenance/ ; journal du squelette (TPL-D-059, TPL-D-065)"
     },
     {
-      "text": "182 essais, chacun né d'un défaut démontré ou d'un usage réel. Deux projets réels vivent sur le squelette en plus du template : Alpha, adopté avec son histoire figée, et « Coût moyen crypto », né gouverné.",
+      "text": "183 essais, chacun né d'un défaut démontré ou d'un usage réel. Deux projets réels vivent sur le squelette en plus du template : Alpha, adopté avec son histoire figée, et « Coût moyen crypto », né gouverné.",
       "tone": "good",
       "source": "journal du squelette ; note de test du 9 sept."
     }
   ],
   "waiting_for_owner": [
     {
-      "title": "Envoyer la 3.20.1 et rafraîchir le miroir public",
-      "detail": "la 3.20.1 est promue et taguée (main un commit devant le tag). Restent tes gestes : l'envoi de main et du tag vers origin et vers le NAS, la release GitHub (note de version écrite), puis le rafraîchissement du miroir public JyMinet/squelette sous son propre double arrêt — la copie anonymisée a déjà été vérifiée : 137 fichiers, rien à retirer, audit, démo et essais verts. Ensuite la montée d'Alpha vers la 3.20.1, chantier à part, sous double arrêt.",
-      "source": "journal du squelette (TPL-D-076, TPL-D-077)"
+      "title": "Envoyer la 3.20.2, rafraîchir le miroir public, monter Alpha",
+      "detail": "la 3.20.2 est promue et taguée (main un commit devant le tag). Restent tes gestes : l'envoi de main et du tag vers origin et vers le NAS, la release GitHub ; puis, chacun sous son double arrêt, le rafraîchissement du miroir public JyMinet/squelette (la 3.20.1 y est déjà posée, en attente de ton envoi) et la montée d'Alpha directement de 3.20.0 à 3.20.2 (répétition déjà verte).",
+      "source": "journal du squelette (TPL-D-078, TPL-D-079)"
     },
     {
       "title": "Le miroir public est en ligne : About et Topics",

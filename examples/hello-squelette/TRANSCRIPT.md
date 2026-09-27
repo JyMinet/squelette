@@ -34,7 +34,7 @@ Langue : non choisie (UNKNOWN) — à fixer avec le Project Owner / not chosen y
 Branche : main | HEAD : <commit>
 Contrôles : PASS
 Garde-fou de commit : installé hors de l'arbre de travail
-Squelette : 3.20.1 | core aligné
+Squelette : 3.20.2 | core aligné
 Vue roadmap : absente — roadmap-view --write
 Travaux terminés : 0 | Bloqués : 0
 Prochaine action : Initialiser le projet avec FIRST_START.md et valider le périmètre avec le propriétaire.
@@ -137,7 +137,7 @@ Language: english (EN)
 Branch: main | HEAD: <commit>
 Checks: PASS
 Commit gate: installed outside the worktree
-Skeleton: 3.20.1 | core aligned
+Skeleton: 3.20.2 | core aligned
 Roadmap view: absent — roadmap-view --write
 Work Items done: 1 | Blocked: 0
 Next action: Project at rest; wait for an authorized objective.
@@ -206,7 +206,7 @@ Language: english (EN)
 Branch: work/wi-001-greeting | HEAD: <commit>
 Checks: PASS
 Commit gate: installed outside the worktree
-Skeleton: 3.20.1 | core aligned
+Skeleton: 3.20.2 | core aligned
 Roadmap view: absent — roadmap-view --write
 Work Items done: 1 | Blocked: 0
 WI-001 — Greeting module: IN_PROGRESS
@@ -322,7 +322,7 @@ Language: english (EN)
 Branch: main | HEAD: <commit>
 Checks: PASS
 Commit gate: installed outside the worktree
-Skeleton: 3.20.1 | core aligned
+Skeleton: 3.20.2 | core aligned
 Roadmap view: current
 Work Items done: 2 | Blocked: 0
 Next action: Project at rest; wait for an authorized objective.

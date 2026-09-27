@@ -867,6 +867,45 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   à retirer) restent les gestes du Project Owner (`TPL-D-004`), le miroir sous son propre double arrêt.
   La montée d'Alpha vers la `3.20.1` est un chantier à part, sous double arrêt.
 
+- `TPL-D-078` — **La fausse « nouvelle version » des essais de montée repart elle aussi de registres
+  vierges ; correctif en `3.20.2`.** En répétant sur une copie jetable la montée d'Alpha
+  vers la `3.20.1`, de bout en bout (décision, chantier, démarrage, `template-upgrade --apply`,
+  garde-fou réinstallé), la suite du template lancée depuis cette copie a rendu **182 essais, 181 verts
+  et 1 rouge** : `test_an_upgrade_names_and_seeds_the_files_the_new_version_requires`. Cause : les
+  essais de montée fabriquent une « nouvelle version » du squelette par `make_template_source()`, qui
+  copie l'arbre dans lequel la suite tourne et ne remettait à neuf que `repository_role`. Dans un
+  projet dérivé, cette copie emportait **les records du projet** — son carnet d'idées, dont les idées
+  visent ses chantiers et ses décisions (`ID-006 → WI-079`, `ID-008 → WI-081`, `ID-011 → HD-096`) ;
+  semées par `--seed-required` dans une copie vierge qui n'a ni ces chantiers ni ces décisions, elles
+  faisaient échouer l'audit de la répétition sur `IDEAS`. Le défaut existait déjà avant la `3.20.1` :
+  il était masqué par l'échec plus précoce du volume relié (`TPL-D-076`). Il ne se voit que dans un
+  projet dont des idées visent des chantiers ou des décisions — Alpha est le premier.
+  Décision : « Confirmé : branche claude/v3.20.2-source-de-template-vierge dans
+  ~/Projets/Squelette V3 -runtime-proof, main intouché, pas de push. » (2026-09-27,
+  21:45, en réponse au `STOP 1` — diagnostic, correction, fichiers, version, branche, alternative :
+  ne rien faire et laisser Alpha en `3.20.0` sans suite d'essais chez lui), puis la même
+  phrase redite à 21:59 en réponse au périmètre exact reformulé (`STOP 2`). Correction dans la
+  fixture seule : `make_template_source()` passe la copie par `reset_to_not_started_fixture()` — les
+  mêmes registres vierges que les copies d'essai, `PROJECT_TEMPLATE`, `NOT_STARTED` — au lieu de ne
+  changer que le rôle ; aucune ligne du contrôleur ne change. Un essai nouveau (B16) enregistre une
+  idée visant un chantier dans un projet dérivé relié, bâtit une source de template depuis ce projet,
+  vérifie qu'elle ne porte ni idée, ni décision, ni volume, puis rejoue le chemin tombé
+  (`--seed-required` puis `--apply`) : rouge sur la `3.20.1`, vert après. La promotion reste une
+  décision séparée ; Alpha montera directement de la `3.20.0` à la `3.20.2`, sous son
+  propre double arrêt.
+
+- `TPL-D-079` — **Promotion de la `3.20.2`.** « Promouvoir et tout le reste » (2026-09-27, 22:06), après
+  la livraison de la branche dans l'atelier sous double arrêt (deux confirmations distinctes, 21:45 et
+  21:59, nommant le dossier), vérifiée sur l'arbre livré : 183 essais verts, audit, bootstrap-audit,
+  traçabilité et démo PASS ; copie jetable d'Alpha montée avec ce core : 183 essais,
+  0 échec. `claude/v3.20.2-source-de-template-vierge` est promue branche canonique par fast-forward de
+  `main` ; la baseline promue reçoit le tag `v3.20.2`, posé sur le commit qui enregistre cette décision ;
+  la vue est régénérée ensuite et committée à part, si bien que `main` est un commit devant le tag.
+  « Tout le reste » — l'envoi vers `origin` et vers le NAS, la release, le rafraîchissement du miroir
+  public et la montée d'Alpha (directement de la `3.20.0` à la `3.20.2`) — ne se déduit
+  pas de cette phrase : l'envoi et la release restent les gestes du Project Owner (`TPL-D-004`), le
+  miroir et la montée ont chacun leur double arrêt propre.
+
 ## Décisions du Project Owner — 2026-09-10 (suite 10)
 
 - `TPL-D-051` — **Deux des trois constats de la troisième passe de contrôle (3.17.0).** La troisième
@@ -879,6 +918,39 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   d'abord** `F-08`, la baseline défigeable, qui demande d'ancrer une déclaration à la décision qui
   la nomme, donc de toucher au format des décisions, alors qu'Alpha en a deux
   déclarées. La promotion reste une décision séparée.
+
+## 2026-09-27 — `claude/v3.20.2-source-de-template-vierge` — la fausse nouvelle version repart de registres vierges
+
+- Mandat : `TPL-D-078`. Double arrêt : `STOP 1` (dossier cible, action, fichiers, version, branche,
+  alternative) → « Confirmé : branche claude/v3.20.2-source-de-template-vierge dans
+  ~/Projets/Squelette V3 -runtime-proof, main intouché, pas de push. » (21:45) ;
+  `STOP 2` (périmètre exact reformulé : branche, deux commits, `main` intouché, aucun tag, aucun push,
+  aucune suppression, aucune ligne du contrôleur) → la même phrase, redite à 21:59.
+- Baseline : `main` à `a443fbe` (`v3.20.1` = `98a9137`, plus la vue régénérée).
+- Trouvé par : la répétition, sur copie jetable, de la montée d'Alpha vers la `3.20.1`
+  — un essai rouge sur 182, le seul que le volume relié masquait encore.
+- **Le constat.** `make_template_source()` copie l'arbre courant pour en faire une « nouvelle
+  version » de la source ; dans un projet dérivé, la copie emporte les records du projet, et
+  `--seed-required` sème ses idées — qui visent ses chantiers et ses décisions — dans une copie
+  vierge qui ne les a pas : `FAIL: IDEAS — ID-006: target WI-079 is not in the roadmap …`.
+- **La correction, dans la fixture seule** : la source passe par `reset_to_not_started_fixture()`,
+  comme toute copie d'essai. Pour le template, rien ne change : ses records sont déjà vierges.
+- **L'essai qui manquait** : `test_a_template_source_built_inside_a_derived_project_carries_none_of_its_records`
+  (B16) — projet dérivé relié, idée `PLANNED` visant `WI-000` enregistrée par `idea add`, source de
+  template bâtie depuis ce projet (aucune idée, aucune décision, aucun volume, rôle template), puis
+  le chemin tombé : projet sans les fichiers obligatoires, `--seed-required`, `--apply`, audit `IDEAS`
+  PASS. Vérifié rouge sur la `3.20.1` (copie où seul l'essai est ajouté : la source portait `ID-001`),
+  vert après.
+- 183 essais OK sur le template (VM Linux du poste, Python 3.10.12) ; `audit` PASS ; `demo.py --check`
+  PASS. Copie jetable d'Alpha montée avec ce core : **183 essais, 173 réussis,
+  10 ignorés, 0 échec**.
+- Manifeste régénéré (`skeleton_version` `3.20.2`), démo et transcript régénérés, feuille de route
+  mise à jour (version `3.20.2`, état « maintenant », promotion en attente).
+- Commits passés sous `PROJECT_CONTROL_HOOK_OVERRIDE="TPL-D-078"` (le squelette est en mode
+  amorçage) ; branche livrée par transfert local depuis la copie fidèle de session, sans checkout de
+  la branche dans le dossier accordé.
+- Non fait : tag, push, release, miroir public (gestes du Project Owner) ; montée d'Alpha
+  V8 (directement de `3.20.0` à `3.20.2`, chantier à part, sous double arrêt).
 
 ## 2026-09-27 — `claude/v3.20.1-fixture-registres-vierges` — la copie d'essai repart de registres vierges
 

@@ -3075,6 +3075,50 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
         )
         self.assertEqual(replayed.returncode, 0, replayed.stdout + replayed.stderr)
 
+    def test_a_template_source_built_inside_a_derived_project_carries_none_of_its_records(self) -> None:
+        """B16. The upgrade tests build a "newer template" by copying the tree this suite runs in
+        (`make_template_source`). Run inside a derived project, that copy used to carry the
+        project's own records — its ideas, aimed at its Work Items and its decisions. Planted by
+        `--seed-required` into a pristine copy that has neither, they failed the rehearsal audit on
+        IDEAS: the one test still red on a real project after 3.20.1, hidden until then behind the
+        bound volume. A template source is a template: blank records, whatever project the suite
+        runs in — and the seeding path that fell passes from such a project."""
+        temporary, derived, _, _ = self.bound_project()
+        self.addCleanup(temporary.cleanup)
+        # An idea of the derived project, aimed at its own Work Item, recorded by the controller.
+        added = run_control(
+            derived, "idea", "add", "--quote", "Garder la trace de ce que le projet a décidé.",
+            "--source", "discussion du Project Owner, 2026-09-27", "--state", "PLANNED", "--target", "WI-000",
+        )
+        self.assertEqual(added.returncode, 0, added.stdout + added.stderr)
+        audit = run_control(derived, "audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
+        with unittest.mock.patch.object(sys.modules[__name__], "ROOT", derived):
+            upstream = self.make_template_source("9.9.9")
+            self.assertEqual(load_json(upstream / "docs/governance/ideas-state.v1.json")["ideas"], [],
+                             "a template source records no idea of the project it was built in")
+            notebook = (upstream / "docs/governance/HUMAN_DECISIONS.md").read_text(encoding="utf-8")
+            self.assertEqual(self.control_module.decision_references(notebook), [], "nor a decision")
+            self.assertFalse((upstream / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md").exists(), "nor a volume")
+            self.assertEqual(load_json(upstream / "project_control/project-state.v1.json")["repository_role"],
+                             "PROJECT_TEMPLATE")
+            copy_temporary, root = self.make_normal_copy()
+            self.addCleanup(copy_temporary.cleanup)
+        # The very path that fell: a project older than the mandatory files, seeded from the
+        # source, then upgraded — the rehearsal audits what the seeds say.
+        required = ["docs/governance/IDEAS.md", "docs/governance/ideas-state.v1.json",
+                    "project_control/roadmap-view.v1.json"]
+        removed = run_git(root, "rm", "-q", "--", *required)
+        self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+        self.commit_fixture(root, "fixture: a project older than these mandatory files")
+        seeded = run_control(root, "template-upgrade", "--source", str(upstream), "--seed-required")
+        self.assertEqual(seeded.returncode, 0, seeded.stdout + seeded.stderr)
+        self.commit_fixture(root, "chore: seed the files 9.9.9 requires")
+        applied = run_control(root, "template-upgrade", "--source", str(upstream), "--apply")
+        self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
+        self.assertIn("PASS: UPGRADE_REHEARSAL", applied.stdout)
+        self.assertIn("PASS: IDEAS", run_control(root, "audit").stdout)
+
     def test_a_baseline_leaves_only_on_a_decision_that_names_the_removal(self) -> None:
         """Step 2 of the scenario the third control executed: a Work Item legitimately authorised
         to write the project state sets the adoption baseline to null and commits — an ordinary
@@ -4822,11 +4866,13 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
         source = Path(temporary.name) / f"template-{version}"
         shutil.copytree(ROOT, source, ignore=fixture_copy_ignore())
         # The source is a template tree by definition, even when this suite runs inside a
-        # derived project: only the template may regenerate a manifest.
-        state_path = source / "project_control/project-state.v1.json"
-        state = load_json(state_path)
-        state["repository_role"] = "PROJECT_TEMPLATE"
-        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        # derived project: a pristine skeleton — blank records, PROJECT_TEMPLATE, NOT_STARTED —
+        # exactly what `make_copy` starts from, and only the template may regenerate a manifest.
+        # Copied as it was, a source built inside a derived project carried that project's own
+        # records; `--seed-required` then planted its ideas — aimed at its Work Items and its
+        # decisions — in a pristine copy that has neither, and the rehearsal audit failed on
+        # IDEAS: the one test still red on a real project after 3.20.1.
+        self.reset_to_not_started_fixture(source)
         if mutate is not None:
             mutate(source)
         written = run_control(source, "core-manifest", "--write", "--version", version)
