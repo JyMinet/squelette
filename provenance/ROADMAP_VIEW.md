@@ -1,36 +1,37 @@
-<!-- ROADMAP_VIEW sources_digest=a34ab5c671b4b6cccea4c19cb66f1fcfd8341a8594f87e381254cc018118eda2 generated_at=2026-09-15T09:52:11Z head=6a733ea1700a0575623e4441a899ffb1f7a7c640 -->
+<!-- ROADMAP_VIEW sources_digest=edd976078b6e914a1dcaa9ff21a68ad82f4cae4d3c451b2442e9c3cde468dc49 generated_at=2026-09-27T18:48:10Z head=98a91379c60952379dd4d7279d3f2d5ae787adbd -->
 # ROADMAP SQUELETTE
 
 Vue générée par `roadmap-view` depuis les fichiers du projet ; elle montre, elle ne décide rien. Ne pas éditer à la main : relancer la commande.
 
 ## Vérification
 
-- Vérifié le : 15 sept. 2026, 09:52 UTC
+- Vérifié le : 27 sept. 2026, 18:48 UTC
 - Comment : le dossier du projet a été lu par le contrôleur, sans rien y modifier
-- Version : 3.19.2, la dernière promue — le commit courant n’est pas tagué
-- Sauvegardes : aucune sauvegarde distante connue
-- Vérifications : les contrôles du dossier passent · 181 essais automatiques présents, non exécutés par cette vue
+- Version : 3.20.1, la dernière promue
+- Sauvegardes : en retard : origin
+- Vérifications : les contrôles du dossier passent · 182 essais automatiques présents, non exécutés par cette vue
 - Mise à jour : chaque jour ; à la demande dans la discussion ROADMAP
 
 ## Maintenant
 
-- La version 3.19.2 est la dernière promue ; la 3.20.0 se prépare. _(source : dossier du squelette (tags))_
-- Aucune sauvegarde distante n’est connue depuis ce dossier. _(source : dossier du squelette (remotes))_
+- La version 3.20.1 est la dernière promue ; le dossier est bien sur elle. _(source : dossier du squelette (tags))_
+- Des sauvegardes distantes sont en retard sur la branche principale : origin. _(source : dossier du squelette (remotes))_
 - Les contrôles du dossier passent tous ; les essais automatiques, eux, ne sont pas exécutés par cette vue. _(source : contrôleur, audit du dossier)_
-- Branches de travail non intégrées : claude/v3.20-deux-volumes. _(source : dossier du squelette (branches))_
-- Le squelette est en 3.19.2 ; Alpha aussi, monté le 12 septembre sous HD-084 / WI-071, ses deux baselines confirmées par décision (HD-074, HD-075) et la protection de son passé ancrée. Non vérifié par ce tableau : il ne regarde que le squelette. _(source : journal du squelette (TPL-D-057, TPL-D-059, TPL-D-065, TPL-D-070, TPL-D-072) ; décisions HD-074 à HD-084 d'Alpha)_
+- Aucune branche de travail ouverte : tout est intégré. _(source : dossier du squelette (branches))_
+- Le squelette est en 3.20.1, promue le 27 septembre : elle corrige la suite d'essais pour les projets qui ont relié leur volume de décisions. Alpha est en 3.20.0 depuis le 20 septembre (HD-088 / WI-074) et a relié son volume 1 le même jour (HD-089) ; c'est cette reliure qui a fait apparaître le défaut, à la clôture de WI-081 le 27 septembre. Il montera en 3.20.1 sous son propre double arrêt. Non vérifié par ce tableau : il ne regarde que le squelette. _(source : journal du squelette (TPL-D-072, TPL-D-074, TPL-D-076, TPL-D-077) ; brief du Project Owner du 27 septembre (décisions HD-088, HD-089 et chantier WI-081 d'Alpha))_
 - Cinq passes de contrôle indépendant depuis le 10 septembre : vingt et un défauts démontrés, tous corrigés avec leur essai. La cinquième a trouvé que le rangement des copies jetables de la 3.18.2 pouvait effacer le worktree d'un autre, et qu'un nom accentué échappait à la règle de contenu des fusions — fermés en 3.19.1. La revue de cadrage de « la question de l'existant » a ensuite fait apparaître un défaut de reprise, corrigé en 3.19.2. Le squelette est public depuis le 11 septembre : JyMinet/squelette, miroir anonymisé du dépôt privé, rafraîchi en 3.19.2. _(source : rapports sous provenance/maintenance/ ; journal du squelette (TPL-D-059, TPL-D-065))_
-- 165 essais, chacun né d'un défaut démontré ou d'un usage réel. Deux projets réels vivent sur le squelette en plus du template : Alpha, adopté avec son histoire figée, et « Coût moyen crypto », né gouverné. _(source : journal du squelette ; note de test du 9 sept.)_
+- 182 essais, chacun né d'un défaut démontré ou d'un usage réel. Deux projets réels vivent sur le squelette en plus du template : Alpha, adopté avec son histoire figée, et « Coût moyen crypto », né gouverné. _(source : journal du squelette ; note de test du 9 sept.)_
 
 ## Ce qui t’attend
 
-1. **Le miroir public est en ligne : About et Topics** https://github.com/JyMinet/squelette — première version publique 3.19.1, tag et release posés le 11 septembre ; le privé est devenu squelette-atelier. Restent About et Topics sur le dépôt public, comme sur le privé, et les releases 3.19.0 et 3.19.1 du privé si tu y tiens (script publier-les-releases.sh). _(source : journal du squelette (TPL-D-067) ; gestes du Project Owner du 11 septembre)_
-2. **Contre-vérification ciblée de la 3.19.1** par le même contrôleur, ses journaux de la cinquième passe en main : les six corrections (F-01 à F-06) et les six phrases de doctrine, rien d'autre — court. Puis une pause sans nouvelle règle : laisser vivre la 3.19 sur Alpha (à monter en 3.19.1, WI à part) et sur le projet neuf. La prochaine passe générale, avec des yeux neufs, juste avant la 4.0.0 publique. _(source : journal du squelette (TPL-D-065))_
-3. **Publier les releases GitHub 3.14.0 → 3.16.1** main et les tags sont partis sur origin et nas ; il ne reste que les releases à créer sur GitHub. Les textes sont écrits, un fichier par version dans « Claude outputs ». _(source : journal du squelette (TPL-D-034 à TPL-D-045))_
-4. **Décider de la suite après la seconde revue** la seconde revue est rendue et ses sept constats sont corrigés en 3.14.0, avec un huitième trouvé en les vérifiant. Restent à trancher : l'étape 2 de la langue (documents de gouvernance en anglais, une seule langue faisant foi par document), l'ouverture d'une procédure d'adoption pour un dépôt jamais gouverné, et la mise à niveau d'Alpha. _(source : contre-revue de la seconde revue ; journal du squelette (TPL-D-031))_
-5. **Approuver la carte de la mise à jour automatique de la ROADMAP** c'est cette approbation qui donne à la tâche du matin l'accès en lecture au dossier ; sans elle, chaque matin dira « non vérifié ». Pour changer le rythme : « RÉGLAGE : regeneration = 4h » (ou off, 1h, daily). _(source : premier passage de la tâche automatique, 7 sept. 23:47 ; fiche P12)_
-6. **Enregistrer les deux consignes proposées dans des cartes** « roadmap-squelette » (celle du tableau) et la mise à jour de « squelette-projet » (style de retour et preuve de lecture, pour la 3.7.0). _(source : fiches P12, P11 et P3)_
-7. **Alpha : en dernier** sa mise à niveau clôturera la série (« on terminera par la mise à jour Alpha ») : après la 3.8.0 et le challenge de Codex, il montera en une fois vers la version stabilisée, avec le style « simple » — deux confirmations avant, dans une autre discussion. Sa sauvegarde NAS reste à envoyer. _(source : décisions des 7 et 8 sept. ; fiches P11 et P2)_
+1. **Envoyer la 3.20.1 et rafraîchir le miroir public** la 3.20.1 est promue et taguée (main un commit devant le tag). Restent tes gestes : l'envoi de main et du tag vers origin et vers le NAS, la release GitHub (note de version écrite), puis le rafraîchissement du miroir public JyMinet/squelette sous son propre double arrêt — la copie anonymisée a déjà été vérifiée : 137 fichiers, rien à retirer, audit, démo et essais verts. Ensuite la montée d'Alpha vers la 3.20.1, chantier à part, sous double arrêt. _(source : journal du squelette (TPL-D-076, TPL-D-077))_
+2. **Le miroir public est en ligne : About et Topics** https://github.com/JyMinet/squelette — première version publique 3.19.1, tag et release posés le 11 septembre ; le privé est devenu squelette-atelier. Restent About et Topics sur le dépôt public, comme sur le privé, et les releases 3.19.0 et 3.19.1 du privé si tu y tiens (script publier-les-releases.sh). _(source : journal du squelette (TPL-D-067) ; gestes du Project Owner du 11 septembre)_
+3. **Contre-vérification ciblée de la 3.19.1** par le même contrôleur, ses journaux de la cinquième passe en main : les six corrections (F-01 à F-06) et les six phrases de doctrine, rien d'autre — court. Puis une pause sans nouvelle règle : laisser vivre la 3.19 sur Alpha (à monter en 3.19.1, WI à part) et sur le projet neuf. La prochaine passe générale, avec des yeux neufs, juste avant la 4.0.0 publique. _(source : journal du squelette (TPL-D-065))_
+4. **Publier les releases GitHub 3.14.0 → 3.16.1** main et les tags sont partis sur origin et nas ; il ne reste que les releases à créer sur GitHub. Les textes sont écrits, un fichier par version dans « Claude outputs ». _(source : journal du squelette (TPL-D-034 à TPL-D-045))_
+5. **Décider de la suite après la seconde revue** la seconde revue est rendue et ses sept constats sont corrigés en 3.14.0, avec un huitième trouvé en les vérifiant. Restent à trancher : l'étape 2 de la langue (documents de gouvernance en anglais, une seule langue faisant foi par document), l'ouverture d'une procédure d'adoption pour un dépôt jamais gouverné, et la mise à niveau d'Alpha. _(source : contre-revue de la seconde revue ; journal du squelette (TPL-D-031))_
+6. **Approuver la carte de la mise à jour automatique de la ROADMAP** c'est cette approbation qui donne à la tâche du matin l'accès en lecture au dossier ; sans elle, chaque matin dira « non vérifié ». Pour changer le rythme : « RÉGLAGE : regeneration = 4h » (ou off, 1h, daily). _(source : premier passage de la tâche automatique, 7 sept. 23:47 ; fiche P12)_
+7. **Enregistrer les deux consignes proposées dans des cartes** « roadmap-squelette » (celle du tableau) et la mise à jour de « squelette-projet » (style de retour et preuve de lecture, pour la 3.7.0). _(source : fiches P12, P11 et P3)_
+8. **Alpha : en dernier** sa mise à niveau clôturera la série (« on terminera par la mise à jour Alpha ») : après la 3.8.0 et le challenge de Codex, il montera en une fois vers la version stabilisée, avec le style « simple » — deux confirmations avant, dans une autre discussion. Sa sauvegarde NAS reste à envoyer. _(source : décisions des 7 et 8 sept. ; fiches P11 et P2)_
 
 ## Prochaines étapes
 
@@ -218,13 +219,14 @@ Vue générée par `roadmap-view` depuis les fichiers du projet ; elle montre, e
 
 ## Pour les techniciens
 
-- généré le 2026-09-15T09:52:11Z · style PLAIN · rôle PROJECT_TEMPLATE
-- branch `claude/v3.20-deux-volumes` · HEAD `6a733ea1700a0575623e4441a899ffb1f7a7c640` · tag `none`
-- audit PASS · skeleton 3.20.0 · core aligné · hook INSTALLED
+- généré le 2026-09-27T18:48:10Z · style PLAIN · rôle PROJECT_TEMPLATE
+- branch `main` · HEAD `98a91379c60952379dd4d7279d3f2d5ae787adbd` · tag `v3.20.1`
+- audit PASS · skeleton 3.20.1 · core aligné · hook INSTALLED
+- remotes: `origin` `0e74009a251f97f8ab9df8703378d50b7db52de1`
 - fiches de cadrage: P1 `provenance/maintenance/scopes/p1-consolidation-baseline-unique.md` · P2 `provenance/maintenance/scopes/p2-scope-template-upgrade.md` · P3 `provenance/maintenance/scopes/p3-scope-preuve-lecture-autorites.md` · P4 `provenance/maintenance/scopes/p4-scope-capability-adversarial-review.md` · P6 `provenance/maintenance/scopes/p12-scope-roadmap-dediee.md` · P7 `provenance/maintenance/scopes/p7-scope-question-de-l-existant.md` · P9 `provenance/maintenance/scopes/p9-scope-records-administratifs-et-branches.md` · P10 `provenance/maintenance/scopes/p10-scope-publication-vitrine-github.md` · P11 `provenance/maintenance/scopes/p11-scope-style-de-retour.md` · P12 `provenance/maintenance/scopes/p12-scope-roadmap-dediee.md` · P13 `provenance/maintenance/scopes/mandat-codex-revue-robustesse-squelette-3.9.0.md` · P14 `provenance/maintenance/scopes/p14-scope-langue-au-choix.md` · P15 `provenance/maintenance/scopes/p15-scope-amorcage-outille.md` · P16 `provenance/maintenance/scopes/p16-scope-garde-fou-de-commit.md` · P17 `provenance/maintenance/scopes/p17-scope-baseline-defigeable.md` · P18 `provenance/maintenance/scopes/p18-scope-publication.md` · P19 `provenance/maintenance/scopes/p19-scope-deux-volumes.md`
-- sources_digest `a34ab5c671b4b6cccea4c19cb66f1fcfd8341a8594f87e381254cc018118eda2`
-- `provenance/CHANGELOG.md` sha256=`d2b9856febbcdfe9be4b285b62a6d97ebe0832bb5210f98d9eaacbb45773f679`
-- `provenance/core-manifest.v1.json` sha256=`22669cfd659d347e85ff79d34df3f0cac0aa3198a2816b5addc401d8e51d39f7`
-- `provenance/roadmap-template.v1.json` sha256=`7bc1c22300efb4265327b5f65c458e3645e5fd04b2ba5d27a50eb73901d3cd1f`
+- sources_digest `edd976078b6e914a1dcaa9ff21a68ad82f4cae4d3c451b2442e9c3cde468dc49`
+- `provenance/CHANGELOG.md` sha256=`a906ea3281f40ab3e1d6d641150ad5ee4466df4921067df120666b2810577858`
+- `provenance/core-manifest.v1.json` sha256=`09d8613ec13c03bbe468851e483da72581e1f397dc40b0c556c7561d4cfb6633`
+- `provenance/roadmap-template.v1.json` sha256=`cc6ff3af4ac8ce768e7874e60c19bfa3273fe1ad929e5231bb3ef18715d33a59`
 - `provenance/roadmap-view.v1.json` sha256=`e882d6fd32842655e80204edbbf0a4721a60e1cd31b5b1abb5cda00b25f2a0ea`
-- `(versions taguées du dépôt)` sha256=`c174f07f4bb14879b61b17c541372cbd45d47aa31f46945f479c6b3db0cdae94`
+- `(versions taguées du dépôt)` sha256=`26d01e5ff6a865950472556e1961a9300de78ffc81f9beeac645e47b7f17b6d1`

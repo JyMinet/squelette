@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "skeleton_version": "3.20.0",
+  "skeleton_version": "3.20.1",
   "core": {
     "ADOPTION.md": "f7d494c64c2cddc2dbdbb1ea61f19fddab34b3e47b269b3959640c239fdf7fbe",
     "CLAUDE.md": "b2e21d4dada733ee89dec030e628d1b28398463ea2b72586910fda1b0c5a5f14",
@@ -25,6 +25,6 @@
     "tests/fixtures/project_control/agent-run.valid.json": "24fcd7f92d19a5edba3c262a0e7b6254359e2ee3918530e05e77fa08b37990ae",
     "tests/fixtures/project_control/conversation.valid.json": "4f78b22f0fb90c8ef2ec84a98671402c5d664579351f724cd0bbfabe3ccaefc2",
     "tests/fixtures/project_control/work-item.valid.json": "e6445e327d8d8adf7709d9135404bf654f49c959ffad6f937bda0c5920648f82",
-    "tests/test_template.py": "65803e29cb735286325cd0dac3a65622dd68b2cb564780b1c87031f9c7cdaa26"
+    "tests/test_template.py": "4053fe8cbd625f98edf52fa2fbd5a4ba371efb257549fd58e9a761e62e935873"
   }
 }

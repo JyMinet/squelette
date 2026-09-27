@@ -269,12 +269,24 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        # The decision registers of a pristine skeleton: one living notebook without a recorded
+        # decision, no bound volume and no summary of one. A derived project runs this same suite
+        # on itself, and once it has bound its frozen decisions (P19) the volume names a commit of
+        # THAT project's history — a commit no fixture copy has, since every copy starts its own
+        # history at one commit. Copied as it was, the volume failed every audit of every copy on
+        # DECISION_VOLUMES_CONSISTENT ("the comparison term is unavailable"): 144 of 181 tests on a
+        # real project, one week after its binding. The control is right to refuse; the fixture is
+        # what has to be pristine.
         decisions_path = root / "docs/governance/HUMAN_DECISIONS.md"
-        decisions = decisions_path.read_text(encoding="utf-8")
+        decisions = self.control_module.strip_decisions_summary(
+            decisions_path.read_text(encoding="utf-8")
+        )
         decisions_path.write_text(
             re.sub(r"(?ms)\n## HD-[0-9]{3,}\s*$.*\Z", "\n", decisions),
             encoding="utf-8",
         )
+        for volume in sorted((root / "docs/governance").glob("HUMAN_DECISIONS_VOLUME_*.md")):
+            volume.unlink()
         registry_path = root / "docs/governance/WORKTREE_REGISTRY.md"
         registry = registry_path.read_text(encoding="utf-8")
         registry_path.write_text(
@@ -3025,6 +3037,43 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
         # The promise of frozen history is extended to the move, in the same words.
         self.assertEqual(doctrine.count("reconstruites ni requalifiées"), 2,
                          "the promise is stated for the adoption baseline and for the binding")
+
+    def test_the_suite_still_runs_from_a_derived_project_that_bound_its_volume(self) -> None:
+        """B15. A derived project runs this same suite on itself, and every fixture copy starts its
+        own history at one commit. Once the project has bound its frozen decisions, the volume
+        names a commit of that project's history — one no copy has. Measured on a real project one
+        week after its binding: 144 of 181 tests failed on `DECISION_VOLUMES_CONSISTENT … the
+        comparison term is unavailable`, before testing anything they were written for. The
+        control is right to refuse; the fixture is what has to be pristine — one living notebook,
+        no bound volume, no summary of one — and the copies made from such a project pass both
+        audits, exactly as the copies made from the template do."""
+        temporary, derived, _, _ = self.bound_project()
+        self.addCleanup(temporary.cleanup)
+        self.assertTrue((derived / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md").is_file())
+        with unittest.mock.patch.object(sys.modules[__name__], "ROOT", derived):
+            pristine_temporary, pristine = self.make_copy()
+            self.addCleanup(pristine_temporary.cleanup)
+            self.assertFalse((pristine / "docs/governance/HUMAN_DECISIONS_VOLUME_1.md").exists(),
+                             "a pristine skeleton has no bound volume")
+            notebook = (pristine / "docs/governance/HUMAN_DECISIONS.md").read_text(encoding="utf-8")
+            self.assertNotIn(self.control_module.DECISIONS_SUMMARY_START, notebook, "nor a summary of one")
+            self.assertEqual(self.control_module.decision_references(notebook), [], "nor a recorded decision")
+            bootstrap_audit = run_control(pristine, "bootstrap-audit")
+            self.assertEqual(bootstrap_audit.returncode, 0, bootstrap_audit.stdout + bootstrap_audit.stderr)
+            self.assertIn("PASS: DECISION_VOLUMES_CONSISTENT", bootstrap_audit.stdout)
+            normal_temporary, normal = self.make_normal_copy()
+            self.addCleanup(normal_temporary.cleanup)
+        audit = run_control(normal, "audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
+        self.assertIn("PASS: DECISION_VOLUMES_CONSISTENT", audit.stdout)
+        # The suite itself, replayed from the derived project the way its owner runs it — on the
+        # very test that fell first on the real project.
+        replayed = subprocess.run(
+            [sys.executable, "-B", "-m", "unittest",
+             "tests.test_template.GeneralProjectSkeletonTests.test_a_new_not_started_copy_passes_bootstrap_audit"],
+            cwd=derived, check=False, capture_output=True, text=True,
+        )
+        self.assertEqual(replayed.returncode, 0, replayed.stdout + replayed.stderr)
 
     def test_a_baseline_leaves_only_on_a_decision_that_names_the_removal(self) -> None:
         """Step 2 of the scenario the third control executed: a Work Item legitimately authorised

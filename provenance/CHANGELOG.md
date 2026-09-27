@@ -800,6 +800,73 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   Owner (`TPL-D-004`). L'application de la coupe dans Alpha attend, à sa demande, la
   clôture de son chantier en cours, puis un double arrêt propre.
 
+- `TPL-D-075` — **Les deux mandats qui manquaient rejoignent le dépôt.** En vérifiant, avant de les
+  effacer, que les dossiers de chantier ne contenaient plus rien d'unique, deux textes sont
+  apparus : le **mandat** de la revue de la borne d'éligibilité de P7 et le **mandat** du contrôle
+  de la cinquième passe sur la `3.18.2`. Leurs rapports étaient rangés depuis longtemps ; les
+  consignes qui les avaient commandés, non — un rapport sans son mandat ne dit plus au nom de quoi
+  il a été écrit. Mandat : « oui sauvegarde les mandats » (2026-09-15), sur la proposition de les
+  copier avant d'effacer les dossiers. Copiés tels quels, sans retouche, sous
+  `provenance/maintenance/scopes/mandat-revue-p7-borne.md` (SHA-256 `3dc14ae0cef2e95525e3ab9c96903bb7668b914c4f0aa51a4555563fd1a60046`)
+  et `provenance/maintenance/scopes/mandat-controle-squelette-3.18.2-passe-5.md`
+  (SHA-256 `cb32560afd933c463455bee1c60aeda6a9a370be0d53ff9a4392481173132f56`). Rien d'autre ne change :
+  aucun fichier core, aucune version nouvelle, aucune promotion. Les deux dossiers de chantier ont
+  été effacés ensuite, leurs autres pièces ayant été vérifiées identiques à celles déjà rangées.
+
+## Décisions du Project Owner — 2026-09-27
+
+- `TPL-D-076` — **La copie d'essai repart de registres de décisions vierges ; correctif en
+  `3.20.1`.** À la clôture d'un chantier d'Alpha (`WI-081`, core `3.20.0`), la suite du
+  template lancée depuis ce projet a rendu **144 échecs sur 181 essais** (10 ignorés, 27 réussis), tous
+  sur la même ligne : `DECISION_VOLUMES_CONSISTENT — cannot read docs/governance/HUMAN_DECISIONS.md
+  at the binding origin d4d7b5a… : the comparison term is unavailable`. Même résultat sur son `main`
+  d'avant le chantier et sous deux Python (3.14 sur le poste, 3.10 dans une VM) : le défaut n'est pas
+  dans le chantier. Ce qui distingue ce projet d'un squelette neuf : il a **relié son volume 1** le
+  20 septembre (`HD-089`, `decision bind`, 64 décisions figées), et le volume nomme le commit de sa
+  reliure — un commit de **son** histoire. Or chaque essai fabrique sa copie par `make_copy()` : copie
+  de l'arbre, `reset_to_not_started_fixture()`, `git init` et **un seul commit**. La copie n'a aucune
+  histoire ; `docs/governance/` y est copié tel quel, volume et sommaire compris ; le contrôleur lit
+  l'origine dans le volume, cherche le carnet à ce commit, ne le trouve pas et refuse — à raison : le
+  terme de comparaison manque vraiment. **Reproduit sans Alpha**, dans une copie fidèle
+  du squelette en espace de session : un projet dérivé bâti par les aides de la suite elle-même, une
+  baseline d'adoption déclarée, une décision reliée, puis la suite lancée depuis ce projet — 181
+  essais, 144 échecs, 10 ignorés, 27 réussis, les 144 sur ce seul message ; le même projet avant la
+  reliure fait tourner la suite au vert (171 réussis, 10 ignorés). Inventaire des autres documents
+  copiés tels quels : le volume est le **seul** dont le contrôleur compare le contenu à l'histoire Git
+  du projet ; le sommaire du carnet vivant désigne le volume, pas un commit, et n'est vérifié que si le
+  volume existe ; les autres commits qu'un projet peut citer (état du dépôt, ADR, décisions, records)
+  ne sont pas résolus par le contrôleur ou sont déjà neutralisés par la fixture. Décision : « Oui »
+  (2026-09-27), sur la proposition de corriger **la fixture des essais, pas le contrôle** :
+  `reset_to_not_started_fixture()` rend les registres de décisions vierges — carnet vivant sans
+  décision ni sommaire (`strip_decisions_summary`, l'inverse exact de ce que `bind` écrit), aucun
+  volume relié —, ce que la doctrine de la fixture promet déjà (« a pristine skeleton … so that a
+  derived project runs this same suite »). `DECISION_VOLUMES_CONSISTENT` ne change pas d'une ligne ;
+  le volume 1 des projets dérivés n'est pas touché : c'est la copie d'essai qui s'en passe, pas le
+  projet. Un essai nouveau (B15) rejoue, depuis un projet dérivé au volume relié, `make_copy` +
+  `bootstrap-audit`, `make_normal_copy` + `audit` et un essai de la suite en sous-processus — rouge
+  sur la `3.20.0`, vert après. Double arrêt : `STOP 1` (dossier cible, action, fichiers, version,
+  branche ; alternative : rien n'entre dans le dossier et chaque projet relié reste sans suite
+  d'essais) → « Oui » ; `STOP 2` (périmètre exact reformulé) → « Confirmé : branche
+  claude/v3.20.1-fixture-registres-vierges dans ~/Projets/Squelette V3 -runtime-proof,
+  main intouché, pas de push. » (2026-09-27). Diagnostic complet :
+  `provenance/maintenance/2026-09-27-diagnostic-3.20.1-fixture-volume-relie.md`. La promotion reste
+  une décision séparée ; la montée d'Alpha vers la `3.20.1` sera un chantier à part,
+  sous son propre double arrêt.
+
+- `TPL-D-077` — **Promotion de la `3.20.1`.** « Promouvoir » (2026-09-27), après la livraison de la
+  branche dans l'atelier sous double arrêt (« Confirmé : branche claude/v3.20.1-fixture-registres-vierges
+  dans ~/Projets/Squelette V3 -runtime-proof, main intouché, pas de push. »), vérifiée sur
+  l'arbre livré : 182 essais verts, audit, bootstrap-audit, traçabilité et démo PASS ; et après un
+  contrôle de l'anonymisation — l'outil d'export accepte la branche sans refus, et la copie publique
+  obtenue passe audit, démo et 181 essais (plus l'essai de l'outil, ignoré là où l'outil est absent).
+  `claude/v3.20.1-fixture-registres-vierges` est promue branche canonique par fast-forward de `main` ;
+  la baseline promue reçoit le tag `v3.20.1`, posé sur le commit qui enregistre cette décision ; la vue
+  est régénérée ensuite et committée à part, si bien que `main` est un commit devant le tag. L'envoi
+  vers `origin` et vers le NAS, la release GitHub et le rafraîchissement du miroir public (137 fichiers,
+  trois de plus que la 3.20.0 — les deux mandats rangés le 15 septembre et le diagnostic du 27 —, rien
+  à retirer) restent les gestes du Project Owner (`TPL-D-004`), le miroir sous son propre double arrêt.
+  La montée d'Alpha vers la `3.20.1` est un chantier à part, sous double arrêt.
+
 ## Décisions du Project Owner — 2026-09-10 (suite 10)
 
 - `TPL-D-051` — **Deux des trois constats de la troisième passe de contrôle (3.17.0).** La troisième
@@ -812,6 +879,59 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   d'abord** `F-08`, la baseline défigeable, qui demande d'ancrer une déclaration à la décision qui
   la nomme, donc de toucher au format des décisions, alors qu'Alpha en a deux
   déclarées. La promotion reste une décision séparée.
+
+## 2026-09-27 — `claude/v3.20.1-fixture-registres-vierges` — la copie d'essai repart de registres vierges
+
+- Mandat : `TPL-D-076`. Double arrêt : `STOP 1` (dossier cible, action, fichiers, version, branche,
+  alternative) → « Oui » ; `STOP 2` (périmètre exact reformulé : branche, deux commits, `main`
+  intouché, aucun tag, aucun push, aucune suppression, aucune ligne du contrôleur) → « Confirmé :
+  branche claude/v3.20.1-fixture-registres-vierges dans ~/Projets/Squelette V3
+  -runtime-proof, main intouché, pas de push. »
+- Baseline : `main` à `0e74009` (`v3.20.0` = `e39d4fa`, plus la vue régénérée et `TPL-D-075`).
+- Trouvé par : la suite du template lancée depuis Alpha à la clôture de `WI-081`
+  (27 septembre) — 144 échecs sur 181, une seule cause. Alpha n'a été ni lu ni copié
+  pour ce chantier : tout vient du brief du Project Owner, et la reproduction s'est faite sur un
+  projet dérivé jetable bâti depuis le squelette.
+- **Le constat.** La copie d'essai est un squelette vierge à un seul commit, mais elle emportait le
+  volume relié d'un projet dérivé — et ce volume nomme un commit que la copie n'a pas. Le contrôle
+  `DECISION_VOLUMES_CONSISTENT` refusait donc chaque audit de chaque copie, avant que l'essai ait
+  mesuré quoi que ce soit. Un second refus attendait derrière : la copie déclare `legacy_baseline:
+  null`, et un volume sans baseline déclarée est refusé aussi. Il n'existe aucune lecture de la
+  fixture d'alors dans laquelle un volume copié pouvait passer.
+- **La correction, dans la fixture seule** (`tests/test_template.py`,
+  `reset_to_not_started_fixture`) : le carnet vivant est débarrassé de son sommaire par l'outil du
+  contrôleur (`strip_decisions_summary`), puis de ses décisions (règle inchangée) ; tout
+  `docs/governance/HUMAN_DECISIONS_VOLUME_*.md` de la copie est retiré. Pour le template et pour un
+  projet qui n'a rien relié, ces deux lignes ne font rien : les copies sont identiques à celles
+  d'avant. Aucune ligne de `scripts/project_control.py` ne change.
+- **L'essai qui manquait** : `test_the_suite_still_runs_from_a_derived_project_that_bound_its_volume`
+  (B15). Il bâtit un projet dérivé relié avec l'aide existante `bound_project()`, pointe `ROOT` sur
+  ce projet et rejoue `make_copy` + `bootstrap-audit`, `make_normal_copy` + `audit`, puis relance en
+  sous-processus, depuis ce projet, l'essai tombé le premier sur le projet réel
+  (`test_a_new_not_started_copy_passes_bootstrap_audit`).
+- Vérifié dans les deux sens : **rouge** sur la fixture `3.20.0` (copie où seul l'essai est ajouté,
+  manifeste régénéré pour isoler la cause : « a pristine skeleton has no bound volume ») ; **vert**
+  après. Reproduction chiffrée avant correction : projet dérivé relié → 181 essais, 144 échecs, tous
+  `the comparison term is unavailable` ; le même projet avant la reliure → 171 réussis, 10 ignorés.
+  Après correction, un projet dérivé relié **refait sur la `3.20.1`** fait tourner la suite sans un
+  seul échec : 182 essais, 172 réussis, 10 ignorés.
+- 182 essais OK sur le template (VM Linux du poste, Python 3.10.12, quatre lots parallèles ; le
+  prototype tourne aussi sous Python 3.11). `audit` PASS, `bootstrap-audit` PASS sur l'arbre committé,
+  traçabilité PASS, `demo.py --check` PASS.
+- Manifeste régénéré (`skeleton_version` `3.20.1`), démo et transcript régénérés, feuille de route du
+  squelette mise à jour (version `3.20.1`, état « maintenant », promotion en attente).
+- Commits passés sous `PROJECT_CONTROL_HOOK_OVERRIDE="TPL-D-076"` : le squelette est lui-même en mode
+  amorçage et son garde-fou refuse tout commit qui touche aux essais ou au core hors des chemins
+  d'amorçage — c'est sa règle, pas un défaut. Le mandat est celui de la double confirmation ; il est
+  imprimé dans le rapport du commit. Branche livrée par transfert local des commits depuis la copie
+  fidèle de session, sans checkout de la branche dans le dossier accordé.
+- Dette héritée, inchangée : la copie d'essai emporte encore les fichiers ignorés du dossier de
+  travail (`make_copy`, notée à la `3.17.1`) — aucun scénario d'échec démontré ici, pas de redline.
+  Observation sans redline : la doctrine « un projet dérivé fait tourner la suite du template chez
+  lui » ne vit que dans deux docstrings et un commentaire de la suite ; l'écrire dans un document
+  routé est une décision du Project Owner.
+- Non fait : tag, push, release, miroir public (gestes du Project Owner) ; montée d'Alpha
+  V8 vers la `3.20.1` (chantier à part, sous double arrêt).
 
 ## 2026-09-15 — `claude/v3.20-deux-volumes` — le carnet vivant et le volume relié
 
