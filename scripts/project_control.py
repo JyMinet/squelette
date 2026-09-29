@@ -16,11 +16,15 @@ import importlib.util
 import json
 import os
 import re
+import secrets
+import shlex
+import stat
 import subprocess
 import sys
 import shutil
 import tempfile
 import time
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import IO, AbstractSet, Any, Iterable, Sequence
@@ -148,6 +152,69 @@ VERSION_TAG = re.compile(r"^v?([0-9]+)\.([0-9]+)\.([0-9]+)$")
 AGENTS_CORE_PATH = "docs/agent-governance/AGENTS.core.md"
 SKELETON_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 SHA256_HEX = re.compile(r"^[a-f0-9]{64}$")
+
+# Copies of the repository (P21, "tableau des clés"). A copy made to protect the original — a
+# construction site, a review, a rehearsal — used to have a birth and no end: folders piled up
+# under different names, and a mandate that lived only in one of them nearly left with it. The
+# original now keeps a register of its copies: the decision that opened each one, what will
+# become of it, when it is due back, and the proof that everything it held came back or was
+# abandoned by name. The controller never creates, moves or erases a folder: it keeps the
+# register, reads the copies, and writes the script the Project Owner runs to erase them.
+COPY_ID = re.compile(r"^COPY-[0-9]{3,}$")
+TEMPLATE_DECISION_ID = re.compile(r"^TPL-D-[0-9]{3,}$")
+COPIES_JSON_PATH = "project_control/copies-state.v1.json"
+TEMPLATE_COPIES_JSON_PATH = "provenance/copies-state.v1.json"
+TEMPLATE_DECISIONS_PATH = "provenance/CHANGELOG.md"
+COPY_KINDS = ("CLONE", "EXPORT")
+COPY_USAGES = ("chantier", "revue", "repetition")
+COPY_FATES = ("RETURN_THEN_ERASE", "ERASE", "KEEP")
+ERASING_FATES = frozenset({"RETURN_THEN_ERASE", "ERASE"})
+COPY_STATES = ("OPEN", "RETURNED", "ERASED", "KEPT")
+COPY_PROOF_ROLES = ("mandat", "livrable", "rapport", "note")
+COPY_SLIP_NAME = "copie.json"
+# An exit slip is a few hundred bytes; anything much larger is not one.
+COPY_SLIP_MAX_BYTES = 65536
+# `<repository>-<usage>-<reference>[-rank]`: the usage from the closed list, the reference a
+# construction site (p21), a version (3.20.2) or a ticket (wi-083, hd-097, tpl-d-080). The date
+# is not in the name: the register carries it.
+COPY_NAME = re.compile(
+    r"^(?P<repository>[a-z0-9]+(?:-[a-z0-9]+)*?)-(?P<usage>chantier|revue|repetition)-"
+    r"(?P<reference>p[0-9]+|[0-9]+\.[0-9]+\.[0-9]+|wi-[0-9]{3,}|hd-[0-9]{3,}|tpl-d-[0-9]{3,})"
+    r"(?:-(?P<rank>[2-9]|[1-9][0-9]+))?$"
+)
+# The register records the paths as the Project Owner names them on his machine. A session that
+# sees that disk through a mount (a virtual machine, a container) maps them to what it sees:
+# `PROJECT_CONTROL_PATH_MAP="/Users/owner/Projets=/mnt/Projets"`, pairs separated by `;`.
+COPY_PATH_MAP_VARIABLE = "PROJECT_CONTROL_PATH_MAP"
+# What the Mac's Finder writes in any folder it shows — window layout, never work. An inventory
+# that counted it would change each time the Project Owner looks at a returned copy.
+COPY_WALK_IGNORED_FILES = frozenset({".DS_Store"})
+CLOSED_WORK_ITEM_STATUSES = frozenset({"DONE", "REJECTED", "SUPERSEDED"})
+# What a copy's `.git` holds, by closed list (measured on real copies, P21 phase 0). Read as
+# references: every reference, and every commit only a reflog still reaches, becomes an item.
+GIT_REFERENCE_ENTRIES = frozenset({"HEAD", "refs", "packed-refs", "logs"})
+# Technical: rewritten by Git as it works, never the Project Owner's work.
+GIT_TECHNICAL_ENTRIES = frozenset({
+    "objects", "index", "COMMIT_EDITMSG", "FETCH_HEAD", "ORIG_HEAD", "shallow", "gitk.cache",
+    COPY_SLIP_NAME,
+})
+# An operation left halfway: its state is not something the controller can return.
+GIT_OPERATION_ENTRIES = frozenset({
+    "MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "AUTO_MERGE", "SQUASH_MSG", "CHERRY_PICK_HEAD",
+    "REVERT_HEAD", "REBASE_HEAD", "rebase-merge", "rebase-apply", "sequencer",
+})
+# Configuration keys that only tune how Git works. Every other key carries meaning — a remote is a
+# link, an alias or a filter is a command — and becomes an item to return or abandon.
+GIT_TECHNICAL_CONFIG_PREFIXES = (
+    "core.", "user.", "branch.", "gc.", "maintenance.", "init.", "extensions.", "pack.", "fetch.",
+    "pull.", "index.", "feature.", "advice.", "color.", "i18n.", "log.", "diff.", "merge.",
+    "status.", "commit.", "tag.", "safe.",
+)
+GIT_MEANINGFUL_CORE_KEYS = frozenset({
+    "core.hookspath", "core.fsmonitor", "core.sshcommand", "core.askpass", "core.editor",
+    "core.pager", "core.worktree", "core.gitproxy", "core.excludesfile", "core.attributesfile",
+    "core.alternaterefscommand",
+})
 
 
 def evidence_directory(work_item_id: str) -> str:
@@ -334,6 +401,21 @@ SPEECH: dict[str, dict[str, str]] = {
               "— they take up {share} % of the register; binding is possible, subject to its own "
               "checks: decision bind",
     },
+    "status.copies": {"FR": "Copies : {summary}", "EN": "Copies: {summary}"},
+    "copies.summary": {
+        "FR": "{open} ouvertes (dont {late} en retard) · {to_erase} à effacer · {kept} conservées",
+        "EN": "{open} open ({late} overdue) · {to_erase} to erase · {kept} kept",
+    },
+    "status.copy_slip": {
+        "FR": "COPIE de {original} — ticket {ticket} — retour attendu le {due} (d'après la fiche de sortie du {issued})",
+        "EN": "COPY of {original} — ticket {ticket} — due back on {due} (per the exit slip of {issued})",
+    },
+    "status.copy_moved": {
+        "FR": "COPIE DÉPLACÉE de {original} — la fiche de sortie indique {path} ; le déplacement se déclare "
+              "depuis l'original (copy move)",
+        "EN": "MOVED COPY of {original} — the exit slip says {path}; the move is recorded from the original "
+              "(copy move)",
+    },
     "status.item": {"FR": "{id} — {title} : {status}", "EN": "{id} — {title}: {status}"},
     "status.objective": {"FR": "  Objectif : {objective}", "EN": "  Objective: {objective}"},
     "status.item_branch": {"FR": "  Branche : {branch} | Cible : {target}", "EN": "  Branch: {branch} | Target: {target}"},
@@ -373,6 +455,7 @@ SPEECH: dict[str, dict[str, str]] = {
     "banner.backups": {"FR": "Sauvegardes", "EN": "Backups"},
     "banner.checks": {"FR": "Vérifications", "EN": "Checks"},
     "banner.refresh": {"FR": "Mise à jour", "EN": "Refresh"},
+    "banner.copies": {"FR": "Copies", "EN": "Copies"},
     "banner.on_demand": {"FR": " ; à la demande dans la discussion ROADMAP",
                          "EN": "; on demand in the ROADMAP conversation"},
     "checks.pass": {"FR": "les contrôles du dossier passent", "EN": "the folder's checks pass"},
@@ -552,6 +635,8 @@ ADMINISTRATIVE_EXACT_PATHS = {
     IDEAS_MD_PATH,
     VIEW_SETTINGS_PATH,
     VIEW_MARKDOWN_PATH,
+    COPIES_JSON_PATH,
+    TEMPLATE_COPIES_JSON_PATH,
 }
 
 BOOTSTRAP_EXACT_PATHS = {
@@ -572,6 +657,7 @@ BOOTSTRAP_EXACT_PATHS = {
     IDEAS_MD_PATH,
     VIEW_SETTINGS_PATH,
     VIEW_MARKDOWN_PATH,
+    COPIES_JSON_PATH,
 }
 BOOTSTRAP_TREE_PATHS = {
     "docs/architecture": {".md", ".json"},
@@ -621,6 +707,7 @@ REQUIRED_FILES = (
     "project_control/schemas/ideas-state.v1.schema.json",
     "project_control/schemas/roadmap-view.v1.schema.json",
     "project_control/schemas/template-roadmap.v1.schema.json",
+    "project_control/schemas/copies-state.v1.schema.json",
     "project_control/work-items/README.md", "project_control/conversations/README.md",
     "project_control/agent-runs/README.md", "project_control/deployments/README.md",
     "provenance/README.md", "reports/README.md", "scripts/check_git_traceability.py",
@@ -674,6 +761,9 @@ CONDITIONALLY_MUTATING = {
     "core-manifest": lambda args: bool(getattr(args, "write", False)),
     "template-upgrade": lambda args: bool(
         getattr(args, "apply", False) or getattr(args, "seed_required", False)),
+    # `copy check` and `copy cleanup` only read the register: the erasure script runs them while
+    # nothing else may write, and they must never wait behind a writer.
+    "copy": lambda args: getattr(args, "copy_command", None) in {"open", "return", "move", "close"},
 }
 
 
@@ -1174,6 +1264,673 @@ def human_decision_field_values(text: str, reference: str, field: str) -> list[s
     if match is None:
         return None
     return [value.strip() for value in re.findall(rf"(?m)^{re.escape(field)}:[ \t]*(\S.*)$", match.group(1))]
+
+
+# --- Copies (P21): helpers that read decisions, paths and copies without the controller. ---
+
+def template_decision_block(text: str, reference: str) -> str | None:
+    """The recorded text of one template decision (`TPL-D-NNN`) of the template's journal.
+
+    A template decision is a bullet `- \\`TPL-D-NNN\\` — …` whose continuation lines are indented;
+    it ends at the next line written from the first column. The lines are returned dedented, so
+    that the structured lines a decision may carry (`Folder scope:`, `Confirmation 1:`,
+    `Confirmation 2:` — required since P21 for a decision that opens a copy) read like the fields
+    of a Human Decision. None when the reference is absent or recorded more than once."""
+    lines = text.splitlines()
+    starts = [index for index, line in enumerate(lines) if re.match(rf"^- `{re.escape(reference)}`", line)]
+    if len(starts) != 1:
+        return None
+    block = [lines[starts[0]][2:]]
+    for line in lines[starts[0] + 1:]:
+        if not line.strip():
+            block.append("")
+            continue
+        if not line.startswith(" "):
+            break
+        block.append(line.strip())
+    return "\n".join(block).rstrip() + "\n"
+
+
+def folder_scope_covers(scope: str, target: str) -> bool:
+    """Does a recorded `Folder scope:` name the folder `target`, or a folder that contains it?
+
+    The scope is a human sentence; a path counts only as a whole path — the folder itself or one
+    of its ancestors, never a string that merely begins like it (`…/copie` does not cover
+    `…/copie-2`). The filesystem root and its first level never count as a granted folder."""
+    parts = PurePosixPath(target).parts
+    for depth in range(len(parts), 2, -1):
+        candidate = str(PurePosixPath(*parts[:depth]))
+        pattern = (rf"(?:^|[\s(«`'\"]){re.escape(candidate)}/?"
+                   r"(?=$|[\s,;)»`'\":]|\.(?:$|\s))")
+        if re.search(pattern, scope):
+            return True
+    return False
+
+
+def copy_path_map() -> list[tuple[str, str]]:
+    """The declared→local path pairs of PROJECT_CONTROL_PATH_MAP, longest declared prefix first."""
+    raw = os.environ.get(COPY_PATH_MAP_VARIABLE, "").strip()
+    pairs: list[tuple[str, str]] = []
+    for chunk in raw.split(";"):
+        if not chunk.strip():
+            continue
+        declared, separator, local = chunk.partition("=")
+        declared, local = declared.strip(), local.strip()
+        if not separator or not declared.startswith("/") or not local.startswith("/"):
+            raise ProjectControlError(
+                f"{COPY_PATH_MAP_VARIABLE}: expected /declared=/local pairs separated by ';', got {chunk!r}")
+        pairs.append((os.path.normpath(declared), os.path.normpath(local)))
+    return sorted(pairs, key=lambda pair: len(pair[0]), reverse=True)
+
+
+def copy_local_path(declared: str) -> Path:
+    """Where this session sees the folder the register names."""
+    for prefix, local in copy_path_map():
+        if declared == prefix or declared.startswith(prefix + "/"):
+            return Path(local + declared[len(prefix):])
+    return Path(declared)
+
+
+def copy_declared_path(local: Path) -> str:
+    """The name the register gives a folder this session sees at `local`."""
+    text = os.path.normpath(str(local))
+    for prefix, seen in sorted(copy_path_map(), key=lambda pair: len(pair[1]), reverse=True):
+        if text == seen or text.startswith(seen + "/"):
+            return prefix + text[len(seen):]
+    return text
+
+
+def paths_overlap(first: str, second: str) -> bool:
+    """Is one of two absolute paths the other, or inside it — in either direction?"""
+    return first == second or first.startswith(second.rstrip("/") + "/") or second.startswith(first.rstrip("/") + "/")
+
+
+# Read-only Git in a copy never reaches a remote: every transport a copy's configuration could
+# name is forbidden on the command line, which outranks any file of configuration.
+COPY_GIT_NO_TRANSPORT = tuple(
+    argument for protocol in ("", "file.", "git.", "ssh.", "http.", "https.", "ext.")
+    for argument in ("-c", f"protocol.{protocol}allow=never")
+)
+# Reading a local repository takes seconds; Git that does not answer is waiting on something — a
+# pipe named like one of its files, a volume gone — and the copy is refused, not waited on.
+COPY_GIT_TIMEOUT_SECONDS = 300
+
+
+def copy_git(path: Path, *arguments: str, text: bool = True) -> subprocess.CompletedProcess:
+    """Git run inside a CLONE copy, read-only. The repository and its working tree are named
+    explicitly — never discovered — so that neither a variable of the calling process (a hook,
+    another repository) nor the copy's own configuration (`core.worktree`, `core.bare`) points Git
+    anywhere else; no optional lock is taken; and no command the copy's configuration names is run:
+    `core.fsmonitor`, which Git runs as soon as it reads the index, is switched off; a missing object
+    is never fetched on demand (`GIT_NO_LAZY_FETCH`, every transport forbidden) — a partial clone is
+    refused before anything is read; and only plumbing commands are used, which read no `log.*`
+    setting (a porcelain log may verify signatures with a program the copy names)."""
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update(GIT_OPTIONAL_LOCKS="0", GIT_DIR=str(path / ".git"), GIT_WORK_TREE=str(path),
+                       GIT_TERMINAL_PROMPT="0", GIT_NO_LAZY_FETCH="1")
+    try:
+        return subprocess.run(["git", "-c", "core.fsmonitor=", *COPY_GIT_NO_TRANSPORT, *arguments], cwd=path,
+                              check=False, capture_output=True, text=text, env=environment,
+                              stdin=subprocess.DEVNULL, timeout=COPY_GIT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise ProjectControlError(
+            f"{path}: Git did not answer within {COPY_GIT_TIMEOUT_SECONDS} s while reading the copy "
+            f"(git {' '.join(arguments[:2])}) — a pipe or a device named like one of its files, or a volume "
+            "gone: the copy is refused, never waited on") from exc
+
+
+def git_object_digest(content_size: int, object_format: str = "sha1") -> Any:
+    """A running Git blob identifier: the header, ready for the bytes."""
+    digest = hashlib.new(object_format)
+    digest.update(b"blob " + str(content_size).encode("ascii") + b"\0")
+    return digest
+
+
+def open_regular_file(path: Path) -> IO[bytes]:
+    """Open a regular file of a copy for reading — never through a link, never a pipe, a socket or
+    a device: opening a pipe waits for a writer, opening a device may act. The type is checked
+    before opening and again on what was opened, so that nothing swapped in between is read."""
+    try:
+        if not stat.S_ISREG(os.lstat(path).st_mode):
+            raise ProjectControlError(f"{path}: not a regular file")
+        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+    except OSError as exc:
+        raise ProjectControlError(f"{path}: {exc.strerror or exc}") from exc
+    handle = os.fdopen(descriptor, "rb")
+    if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+        handle.close()
+        raise ProjectControlError(f"{path}: not a regular file")
+    return handle
+
+
+def file_digests(path: Path, object_format: str = "sha1") -> tuple[str, str]:
+    """(SHA-256 of the bytes, Git blob identifier) of one regular file, read once."""
+    with open_regular_file(path) as handle:
+        size = os.fstat(handle.fileno()).st_size
+        sha256 = hashlib.sha256()
+        blob = git_object_digest(size, object_format)
+        read = 0
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            sha256.update(chunk)
+            blob.update(chunk)
+            read += len(chunk)
+    if read != size:
+        raise ProjectControlError(f"{path} changed while it was read")
+    return sha256.hexdigest(), blob.hexdigest()
+
+
+def regular_file_bytes(path: Path) -> bytes:
+    """The bytes of one regular file of a copy (see `open_regular_file`)."""
+    with open_regular_file(path) as handle:
+        return handle.read()
+
+
+def entry_digests(path: Path, object_format: str = "sha1") -> tuple[str, str]:
+    """(what an inventory records, Git blob identifier) of one entry: where a link points — a link
+    is never followed — or the bytes of a regular file."""
+    if path.is_symlink():
+        target = os.readlink(os.fsencode(path))
+        blob = git_object_digest(len(target), object_format)
+        blob.update(target)
+        return "symlink:" + os.fsdecode(target), blob.hexdigest()
+    return file_digests(path, object_format)
+
+
+def copy_file_fingerprint(path: Path) -> str:
+    """What an inventory records of one file: its bytes, or where a link points."""
+    if not os.path.lexists(path):
+        return "deleted"
+    return entry_digests(path)[0]
+
+
+def recorded_at(recorded: dict[str, Any], relative: str) -> Any:
+    """What a listing records at a walked path — the same name written in either Unicode form
+    (a Mac may keep `é` decomposed where Git records it composed)."""
+    found = recorded.get(relative)
+    if found is None and not relative.isascii():
+        for form in ("NFC", "NFD"):
+            found = recorded.get(unicodedata.normalize(form, relative))
+            if found is not None:
+                break
+    return found
+
+
+def entry_matches(path: Path, recorded: tuple[str, str] | None, object_format: str = "sha1") -> tuple[bool, str, str]:
+    """(is the entry exactly what a tree records at its path, its fingerprint, its blob)."""
+    link = path.is_symlink()
+    fingerprint, blob = entry_digests(path, object_format)
+    same = recorded is not None and (recorded[0] == "120000") == link and recorded[1] == blob
+    return same, fingerprint, blob
+
+
+def copy_walk(base: Path, relative_prefix: str = "", *, skip_top_git: bool = False) -> tuple[list[tuple[str, Path]], list[str]]:
+    """Every entry under `base` that holds bytes — regular files and links, links never followed —
+    as (relative path, path), and what the walk refuses.
+
+    The walk does not ask Git: an index flag, a stat setting, a nested repository or an ignore rule
+    hides nothing from it. It refuses what an erasure could not answer for — a folder it cannot
+    read, a mount point inside the copy (`rm -rf` would cross it) and special files (a pipe would
+    hold the check open)."""
+    found: list[tuple[str, Path]] = []
+    refusals: list[str] = []
+    try:
+        device = os.lstat(base).st_dev
+    except OSError as exc:
+        return found, [f"{relative_prefix or '.'}: unreadable ({exc})"]
+
+    def unreadable(error: OSError) -> None:
+        place = Path(error.filename) if error.filename else base
+        try:
+            relative = relative_prefix + place.relative_to(base).as_posix()
+        except ValueError:
+            relative = str(place)
+        refusals.append(f"{relative}: unreadable ({error.strerror or error})")
+
+    for directory, subdirectories, names in os.walk(base, onerror=unreadable, followlinks=False):
+        current = Path(directory)
+        if skip_top_git and current == base:
+            subdirectories[:] = [entry for entry in subdirectories if entry != ".git"]
+            names = [entry for entry in names if entry != ".git"]
+        kept: list[str] = []
+        for entry in sorted(subdirectories):
+            full = current / entry
+            relative = relative_prefix + full.relative_to(base).as_posix()
+            try:
+                status = os.lstat(full)
+            except OSError as exc:
+                refusals.append(f"{relative}: unreadable ({exc})")
+                continue
+            if stat.S_ISLNK(status.st_mode):
+                found.append((relative, full))
+            elif status.st_dev != device:
+                refusals.append(f"{relative}: a mount point inside the copy — an erasure would cross it")
+            else:
+                kept.append(entry)
+        subdirectories[:] = kept
+        for entry in sorted(names):
+            full = current / entry
+            relative = relative_prefix + full.relative_to(base).as_posix()
+            try:
+                status = os.lstat(full)
+            except OSError as exc:
+                refusals.append(f"{relative}: unreadable ({exc})")
+                continue
+            if stat.S_ISREG(status.st_mode) and entry in COPY_WALK_IGNORED_FILES:
+                continue
+            if stat.S_ISREG(status.st_mode) or stat.S_ISLNK(status.st_mode):
+                found.append((relative, full))
+            else:
+                refusals.append(f"{relative}: a special file (pipe, socket or device) — not supported")
+    return found, refusals
+
+
+def copy_walk_files(base: Path, relative_prefix: str = "") -> list[tuple[str, Path]]:
+    """Every file under `base` (links included, never followed), as (relative path, path)."""
+    return copy_walk(base, relative_prefix)[0]
+
+
+def split_nul(data: bytes) -> list[str]:
+    return [chunk.decode("utf-8", errors="surrogateescape") for chunk in data.split(b"\0") if chunk]
+
+
+def slip_file_concern(path: Path) -> str | None:
+    """Why a file that bears the exit slip's name may be an exit slip — None when it plainly is
+    not one (a link, or JSON of the project's own whose object carries neither `copy_id` nor
+    `token`, or that is not an object).
+
+    Only a small regular file is read, never a link, a pipe or a device. Too large to be read
+    (a slip, padded), not readable, not JSON in UTF-8 (a slip written in another encoding, or
+    damaged), a registered slip, or an object that looks like a slip without reading as one: each
+    is a concern, and the caller refuses — a slip padded or spoiled must not hide its copy."""
+    if path.is_symlink():
+        return None
+    try:
+        with open_regular_file(path) as handle:
+            too_large = os.fstat(handle.fileno()).st_size > COPY_SLIP_MAX_BYTES
+            data = b"" if too_large else handle.read(COPY_SLIP_MAX_BYTES + 1)
+    except ProjectControlError as exc:
+        return f"a file named {COPY_SLIP_NAME} that cannot be read ({exc}) — refused"
+    if too_large or len(data) > COPY_SLIP_MAX_BYTES:
+        return (f"a file named {COPY_SLIP_NAME} too large to be checked "
+                f"(over {COPY_SLIP_MAX_BYTES} bytes) — it may be the exit slip of another copy: refused")
+    try:
+        payload = json.loads(data.decode("utf-8-sig"))
+    except ValueError:
+        return (f"a file named {COPY_SLIP_NAME} that does not read as JSON in UTF-8 — it may be the "
+                "exit slip of another copy, written otherwise or damaged: refused")
+    if not isinstance(payload, dict):
+        return None
+    if all(payload.get(key) for key in ("copy_id", "token", "original")):
+        return f"another registered copy lives inside this one ({payload.get('copy_id')} of {payload.get('original')})"
+    if "copy_id" in payload or "token" in payload:
+        return (f"a file named {COPY_SLIP_NAME} that looks like an exit slip but does not read as a "
+                "registered one — refused")
+    return None
+
+
+def nested_slip_refusal(relative: str, path: Path) -> str | None:
+    """A copy registered by another original, living inside this one: its exit slip says so — or
+    a file bearing the slip's name that may be one (see `slip_file_concern`), refused all the same."""
+    if PurePosixPath(relative).name != COPY_SLIP_NAME:
+        return None
+    concern = slip_file_concern(path)
+    return f"{relative}: {concern}" if concern else None
+
+
+def nested_copies_in_git_dir(git_dir: Path) -> tuple[list[str], bool]:
+    """A copy is never hidden in Git's own folder. Whatever the closed list reads or leaves to Git —
+    hooks, objects, references, logs — a repository, or another registered copy, found anywhere
+    inside `.git` is refused: an erasure would take it along, whatever abandon covers its folder.
+    Every entry is typed from the folder listing without being opened, links are never followed,
+    and a special file (a pipe, a socket, a device) is refused as it is everywhere else — never
+    opened to see what it holds. Returns (refusals, whether Git may be run on this `.git`): not when
+    an entry is special or unreadable — Git would open it and could wait there forever."""
+    refusals: list[str] = []
+    hazardous = False
+    pending = [git_dir]
+    while pending:
+        current = pending.pop()
+        try:
+            with os.scandir(current) as listing:
+                entries = sorted(listing, key=lambda item: item.name)
+        except OSError as exc:
+            refusals.append(f".git/{current.relative_to(git_dir).as_posix()}: unreadable ({exc.strerror or exc})")
+            hazardous = True
+            continue
+        for entry in entries:
+            path = Path(entry.path)
+            relative = ".git/" + path.relative_to(git_dir).as_posix()
+            if entry.name == ".git":
+                refusals.append(f"{relative}: a repository inside .git — not supported")
+            try:  # the type the folder listing gives, without opening anything; links never followed
+                directory, regular, link = (entry.is_dir(follow_symlinks=False), entry.is_file(follow_symlinks=False),
+                                            entry.is_symlink())
+            except OSError as exc:
+                refusals.append(f"{relative}: unreadable ({exc.strerror or exc})")
+                hazardous = True
+                continue
+            if directory:
+                pending.append(path)
+            elif regular:
+                if entry.name == COPY_SLIP_NAME and current != git_dir:
+                    # No file of that name has its place inside `.git`, whatever it holds.
+                    refusals.append(nested_slip_refusal(relative, path) or (
+                        f"{relative}: a file named {COPY_SLIP_NAME} inside .git — an exit slip has no place there: refused"))
+            elif not link:
+                refusals.append(f"{relative}: a special file (pipe, socket or device) — not supported")
+                hazardous = True
+    return refusals, not hazardous
+
+
+def partial_clone_refusal(copy_root: Path) -> str | None:
+    """A partial clone fetches a missing object from its remote on demand — through a transport its
+    configuration names. The controller reads a copy without fetching anything: it refuses one
+    before any object is read. The configuration is read as Git would, inclusions included."""
+    marks: set[str] = set()
+    listed = copy_git(copy_root, "config", "--list", "-z", "--includes")
+    if listed.returncode != 0:
+        return f"cannot read the copy's configuration: {listed.stderr.strip()}"
+    for record in listed.stdout.split("\0"):
+        key, _, value = record.partition("\n")
+        key = key.lower()
+        if key in {"extensions.partialclone", "core.partialclonefilter"} or (
+                key.startswith("remote.") and (key.endswith(".partialclonefilter") or (
+                    key.endswith(".promisor") and value.strip().lower() in {"true", "yes", "on", "1"}))):
+            marks.add(key)
+    pack = copy_root / ".git/objects/pack"
+    if pack.is_dir() and any(pack.glob("*.promisor")):
+        marks.add("objects/pack/*.promisor")
+    if not marks:
+        return None
+    return (f"a partial clone ({', '.join(sorted(marks))}): its missing objects would be fetched from a remote — "
+            "not supported; the controller reads a copy without fetching anything")
+
+
+def meaningful_config_key(key: str) -> bool:
+    """Does a key of a copy's own configuration carry the Project Owner's meaning? A remote is a
+    link; an alias, a filter or a diff or merge driver is a command; an inclusion brings more.
+    Only the keys that tune how Git works are technical."""
+    if key in GIT_MEANINGFUL_CORE_KEYS:
+        return True
+    if key.startswith(("diff.", "merge.")) and key.count(".") >= 2:
+        return True
+    return not key.startswith(GIT_TECHNICAL_CONFIG_PREFIXES)
+
+
+def clone_inventory(copy_root: Path) -> tuple[dict[str, str], list[str]]:
+    """Everything a CLONE copy holds that its own HEAD does not already carry.
+
+    Returns (items, refusals). An item is `kind:name` → fingerprint: references and commits only a
+    reflog still reaches (`ref:`, `head:`, `reflog:` → `commit:<oid>` or `tag:<oid>`); every file
+    of the working tree whose bytes are not those HEAD records at its path — found by walking the
+    folder and hashing each file, never by asking Git what changed, so that no index flag, stat
+    setting or ignore rule can hide one (`worktree:`); staged content that is neither in HEAD nor in
+    the file (`index:`); and what `.git` holds of the Project Owner's (`git:hooks/…`, `git:info/…`,
+    `config:<key>`). A refusal names what the controller cannot return: a halfway operation or an
+    unresolved conflict, submodules and embedded repositories committed as gitlinks, linked
+    worktrees, unreadable folders, mount points, special files, another registered copy inside this
+    one, and any entry of `.git` the closed list does not name — never counted as empty."""
+    items: dict[str, str] = {}
+    refusals: list[str] = []
+    git_dir = copy_root / ".git"
+    if not git_dir.is_dir() or git_dir.is_symlink():
+        return items, ["not a repository root with its own .git folder (a linked worktree or a plain folder is not a CLONE)"]
+    if os.path.lexists(copy_root / ".gitmodules"):
+        refusals.append("submodules (.gitmodules) are not supported")
+    # Every entry of `.git` is typed before Git is run on it: Git opens its files, and a pipe named
+    # like one (HEAD, config, index, a reference) would hold it forever.
+    git_dir_refusals, git_may_run = nested_copies_in_git_dir(git_dir)
+    if not git_may_run:
+        return items, [*refusals, *git_dir_refusals]
+    reference_script = copy_root / "scripts/hooks/pre-commit"
+    try:
+        reference_gate = regular_file_bytes(reference_script) if os.path.lexists(reference_script) else None
+    except ProjectControlError:
+        reference_gate = None
+    for entry in sorted(os.listdir(git_dir)):
+        full = git_dir / entry
+        if entry in GIT_REFERENCE_ENTRIES or entry in GIT_TECHNICAL_ENTRIES or entry in COPY_WALK_IGNORED_FILES:
+            continue
+        if entry.endswith(".lock") or entry.startswith("sharedindex."):
+            continue
+        if entry in GIT_OPERATION_ENTRIES or entry.startswith("BISECT_"):
+            refusals.append(f"a Git operation is in progress in the copy: .git/{entry}")
+            continue
+        if entry == "modules":
+            refusals.append("submodules (.git/modules) are not supported")
+            continue
+        if entry == "worktrees":
+            if full.is_dir() and any(full.iterdir()):
+                refusals.append("linked worktrees (.git/worktrees) are not supported — remove them or run git worktree prune")
+            continue
+        if entry == "hooks" and full.is_dir() and not full.is_symlink():
+            files, walk_refusals = copy_walk(full)
+            refusals.extend(f".git/hooks/{reason}" for reason in walk_refusals)
+            for relative, path in files:
+                if relative.endswith(".sample"):
+                    continue
+                if relative == "pre-commit" and reference_gate is not None and not path.is_symlink() \
+                        and regular_file_bytes(path) == reference_gate:
+                    continue
+                items[f"git:hooks/{relative}"] = copy_file_fingerprint(path)
+            continue
+        if entry == "info" and full.is_dir() and not full.is_symlink():
+            files, walk_refusals = copy_walk(full)
+            refusals.extend(f".git/info/{reason}" for reason in walk_refusals)
+            for relative, path in files:
+                if relative == "refs":
+                    continue
+                if relative == "exclude" and not path.is_symlink():
+                    rules = [line for line in regular_file_bytes(path).decode("utf-8", errors="replace").splitlines()
+                             if line.strip() and not line.lstrip().startswith("#")]
+                    if not rules:
+                        continue
+                items[f"git:info/{relative}"] = copy_file_fingerprint(path)
+            continue
+        if entry == "description" and full.is_file() and not full.is_symlink():
+            if regular_file_bytes(full).decode("utf-8", errors="replace").startswith("Unnamed repository;"):
+                continue
+            items["git:description"] = copy_file_fingerprint(full)
+            continue
+        if entry == "branches" and full.is_dir() and not full.is_symlink():
+            files, walk_refusals = copy_walk(full)
+            refusals.extend(f".git/branches/{reason}" for reason in walk_refusals)
+            for relative, path in files:
+                items[f"git:branches/{relative}"] = copy_file_fingerprint(path)
+            continue
+        if entry == "config" and full.is_file() and not full.is_symlink():
+            listed = copy_git(copy_root, "config", "--local", "--list", "-z")
+            if listed.returncode != 0:
+                refusals.append(f"cannot read the copy's configuration: {listed.stderr.strip()}")
+                continue
+            values: dict[str, list[str]] = {}
+            for record in listed.stdout.split("\0"):
+                if not record:
+                    continue
+                key, _, value = record.partition("\n")
+                values.setdefault(key.lower(), []).append(value)
+            for key, recorded_values in sorted(values.items()):
+                if meaningful_config_key(key):
+                    items[f"config:{key}"] = hashlib.sha256("\0".join(recorded_values).encode("utf-8")).hexdigest()
+            continue
+        refusals.append(f"unknown entry in .git: {entry} — the controller does not know what it holds")
+    refusals.extend(git_dir_refusals)
+    partial = partial_clone_refusal(copy_root)
+    if partial:
+        return items, [*refusals, partial]
+    head = copy_git(copy_root, "rev-parse", "--verify", "HEAD")
+    if head.returncode != 0:
+        return items, [*refusals, "the copy has no commit"]
+    shown_format = copy_git(copy_root, "rev-parse", "--show-object-format")
+    object_format = shown_format.stdout.strip() if shown_format.returncode == 0 and shown_format.stdout.strip() else "sha1"
+    if object_format not in {"sha1", "sha256"}:
+        return items, [*refusals, f"unknown object format of the copy: {object_format}"]
+    listed = copy_git(copy_root, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(objecttype)")
+    if listed.returncode != 0:
+        return items, [*refusals, f"cannot list the copy's references: {listed.stderr.strip()}"]
+    for line in listed.stdout.splitlines():
+        name, oid, kind = (line.split("\0") + ["", ""])[:3]
+        if name:
+            items[f"ref:{name}"] = f"{kind}:{oid}"
+    attached = copy_git(copy_root, "symbolic-ref", "-q", "HEAD")
+    if attached.returncode == 1:
+        items["head:detached"] = f"commit:{head.stdout.strip()}"
+    elif attached.returncode != 0:
+        refusals.append(f"cannot read the copy's HEAD: {attached.stderr.strip()}")
+    # Every commit a reflog still reaches and no reference does — on either side of an entry: where
+    # the reference was as well as where it went. One item per line of such history, its newest
+    # commit: the original that keeps it keeps its ancestors, and an abandon of it abandons them.
+    orphans = copy_git(copy_root, "rev-list", "--parents", "--reflog", "--not", "--all")
+    if orphans.returncode != 0:
+        refusals.append(f"cannot read the copy's reflogs: {orphans.stderr.strip()}")
+    else:
+        parents_of: dict[str, list[str]] = {}
+        for line in orphans.stdout.splitlines():
+            oids = line.split()
+            if oids:
+                parents_of[oids[0]] = oids[1:]
+        inner = {parent for parents in parents_of.values() for parent in parents}
+        for oid in sorted(set(parents_of) - inner):
+            items[f"reflog:{oid}"] = f"commit:{oid}"
+    tree = copy_git(copy_root, "ls-tree", "-r", "-z", "--full-tree", "HEAD", text=False)
+    index = copy_git(copy_root, "ls-files", "-s", "-z", text=False)
+    for result, label in ((tree, "ls-tree HEAD"), (index, "ls-files -s")):
+        if result.returncode != 0:
+            refusals.append(f"cannot read the copy ({label}): {result.stderr.decode('utf-8', 'replace').strip()}")
+    recorded: dict[str, tuple[str, str]] = {}
+    for record in split_nul(tree.stdout):
+        meta, _, relative = record.partition("\t")
+        fields = meta.split()
+        if len(fields) != 3:
+            continue
+        if fields[0] == "160000":
+            refusals.append(f"{relative}: a submodule or embedded repository committed as a gitlink — not supported")
+            continue
+        recorded[relative] = (fields[0], fields[2])
+    staged: dict[str, str] = {}
+    conflicts: set[str] = set()
+    for record in split_nul(index.stdout):
+        meta, _, relative = record.partition("\t")
+        fields = meta.split()
+        if len(fields) != 3:
+            continue
+        if fields[0] == "160000":
+            refusals.append(f"{relative}: a gitlink is staged — embedded repositories are not supported")
+        elif fields[2] != "0":
+            conflicts.add(relative)
+        else:
+            staged[relative] = fields[1]
+    refusals.extend(f"{relative}: an unresolved conflict in the index — finish or abort it first" for relative in sorted(conflicts))
+    files, walk_refusals = copy_walk(copy_root, skip_top_git=True)
+    refusals.extend(walk_refusals)
+    current: dict[str, str] = {}
+    for relative, path in files:
+        nested = nested_slip_refusal(relative, path)
+        if nested:
+            refusals.append(nested)
+        try:
+            same, fingerprint, blob = entry_matches(path, recorded_at(recorded, relative), object_format)
+        except (OSError, ProjectControlError) as exc:
+            refusals.append(f"{relative}: unreadable ({exc})")
+            continue
+        current[relative] = blob
+        if not same:
+            items[f"worktree:{relative}"] = fingerprint
+    empty_blob = git_object_digest(0, object_format).hexdigest()
+    for relative, blob in sorted(staged.items()):
+        in_head = recorded.get(relative)
+        if blob == empty_blob or (in_head is not None and in_head[1] == blob) or recorded_at(current, relative) == blob:
+            continue
+        items[f"index:{relative}"] = f"blob:{blob}"
+    return items, refusals
+
+
+def export_inventory(container: Path, expected: dict[str, tuple[str, str]], object_format: str = "sha1") -> tuple[dict[str, str], list[str]]:
+    """Everything an EXPORT copy holds besides an intact export of its origin.
+
+    The container holds `source/` — the export of a commit of the original, compared file by file
+    to that commit's tree — and whatever the review produced around it (`file:`), walked whole.
+    The exit slip at the container's root is not an item."""
+    items: dict[str, str] = {}
+    if not container.is_dir():
+        return items, ["the copy's folder is not readable"]
+    files, refusals = copy_walk(container)
+    for relative, path in files:
+        if relative == COPY_SLIP_NAME:
+            continue
+        nested = nested_slip_refusal(relative, path)
+        if nested:
+            refusals.append(nested)
+        try:
+            if relative.startswith("source/"):
+                inner = relative[len("source/"):]
+                same, fingerprint, _ = entry_matches(path, recorded_at(expected, inner), object_format)
+                if not same:
+                    items[f"source:{inner}"] = fingerprint
+                continue
+            items[f"file:{relative}"] = copy_file_fingerprint(path)
+        except (OSError, ProjectControlError) as exc:
+            refusals.append(f"{relative}: unreadable ({exc})")
+    return items, refusals
+
+
+def inventory_digest(items: dict[str, str]) -> str:
+    """One fingerprint for a whole inventory: every item with what it holds, in order, written so
+    that no two inventories read the same — canonical JSON, every character outside ASCII escaped
+    (a link may point to a text holding a tab or a line break; a plain `name<TAB>value` line could
+    then be two items at once)."""
+    canonical = json.dumps(sorted(items.items()), ensure_ascii=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("ascii")).hexdigest()
+
+
+def abandoned_items(pattern: str, names: Iterable[str]) -> list[str]:
+    """The items an abandon names: one item by its full name, or every item under a prefix that
+    ends with `/` or `:` (`worktree:scratch/`, `reflog:`)."""
+    prefix = pattern.endswith(("/", ":"))
+    return [name for name in names if name == pattern or (prefix and name.startswith(pattern))]
+
+
+def unsafe_path_characters(path: str) -> bool:
+    """A path the register or a script could not carry on one line: a control character."""
+    return any(ord(character) < 32 or ord(character) == 127 for character in path)
+
+
+def copy_path_errors(declared: str, label: str = "") -> list[str]:
+    """A copy's path, and an original's, are written one way only: absolute, normalized, one line."""
+    name = label or declared
+    if unsafe_path_characters(declared):
+        return [f"{name!r}: a path holds no control character (line break, tab…)"]
+    if not declared.startswith("/") or declared.startswith("//") or os.path.normpath(declared) != declared:
+        return [f"{declared}: a copy's path is absolute and normalized (one leading /, no trailing /, no . or ..)"]
+    return []
+
+
+def parse_copy_slip(data: bytes) -> dict[str, Any] | None:
+    """The JSON object a slip's bytes hold, a leading byte-order mark allowed; None otherwise."""
+    try:
+        payload = json.loads(data.decode("utf-8-sig"))
+    except ValueError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def read_copy_slip(path: Path) -> dict[str, Any] | None:
+    """The exit slip a copy carries, or None when it is absent, unreadable or not one. A slip is a
+    small regular file: a link, a pipe, a socket or a device named like one is never opened (a
+    pipe would hold the reader until a writer came), and a large file is not read. None is a safe
+    answer wherever this is asked — an identity that cannot be read is refused; a search for other
+    copies inside a copy asks `nested_slip_refusal`, which refuses what it cannot check."""
+    try:
+        with open_regular_file(path) as handle:
+            if os.fstat(handle.fileno()).st_size > COPY_SLIP_MAX_BYTES:
+                return None
+            data = handle.read(COPY_SLIP_MAX_BYTES + 1)
+    except ProjectControlError:
+        return None
+    if len(data) > COPY_SLIP_MAX_BYTES:
+        return None
+    return parse_copy_slip(data)
+
 
 def parse_timestamp(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
@@ -2181,6 +2938,11 @@ class ProjectControl:
         add(findings, "ROADMAP", not roadmap_errors, "human and machine roadmaps are synchronized" if not roadmap_errors else "; ".join(roadmap_errors))
         ideas_errors = self.ideas_errors()
         add(findings, "IDEAS", not ideas_errors, "human and machine idea lists are synchronized" if not ideas_errors else "; ".join(ideas_errors))
+        copies_summary, copies_errors, copies_faults = self.copies_audit()
+        add(findings, "COPIES_REGISTER", not copies_errors, copies_summary if not copies_errors else "; ".join(copies_errors))
+        add(findings, "COPIES_RETURNED", not copies_faults,
+            ("this repository is a copy: the copies are judged in the original" if self.copy_guard_errors()
+             else "no copy stays OPEN after its Work Item or version closed") if not copies_faults else "; ".join(copies_faults))
         view_summary, view_errors = self.roadmap_view_audit()
         add(findings, "ROADMAP_VIEW", not view_errors, view_summary if not view_errors else "; ".join(view_errors))
         registry_errors = self.registry_errors()
@@ -2439,6 +3201,865 @@ class ProjectControl:
             raise
         return idea_id
 
+    # --- Copies (P21, « tableau des clés »): the register of the copies made of this ---
+    # --- repository. Each copy has a ticket, a fate decided when it leaves, a date by ---
+    # --- which it is due back, and a proof that everything it held came back or was  ---
+    # --- abandoned by name. The controller reads copies; it never writes into one,    ---
+    # --- and it never creates, moves or erases a folder.                              ---
+
+    def copies_path(self) -> str:
+        return TEMPLATE_COPIES_JSON_PATH if self.repository_role() == "PROJECT_TEMPLATE" else COPIES_JSON_PATH
+
+    @staticmethod
+    def empty_copies_state() -> dict[str, Any]:
+        return {"schema_version": "1.0.0", "updated_at": "UNKNOWN", "copies": []}
+
+    def load_copies(self) -> dict[str, Any]:
+        """The register as the working tree holds it; absent means empty."""
+        path = self.root / self.copies_path()
+        if not path.is_file():
+            return self.empty_copies_state()
+        state = load_json(path)
+        errors = self.copies_register_errors(state)
+        if errors:
+            raise ProjectControlError("invalid copy register: " + "; ".join(errors))
+        return state
+
+    def copies_reference_branch(self) -> str | None:
+        """Where the register is committed: the canonical branch of a project, `main` for the
+        template (which declares no canonical branch), nowhere for a project still initializing."""
+        if self.operating_mode() == "NORMAL_MODE":
+            return self.canonical_branch()
+        if self.repository_role() == "PROJECT_TEMPLATE" and self.operating_mode() == "BOOTSTRAP_MODE":
+            return "main"
+        return None
+
+    def copy_guard_errors(self) -> list[str]:
+        """`copy` commands run in the original only. A copy carries the register as it was when
+        the copy was made — a stale page: it can neither open, return, move, close nor erase."""
+        slips = [self.root / ".git" / COPY_SLIP_NAME]
+        container_slip = self.root.parent / COPY_SLIP_NAME
+        # The `source/` of an export: its container carries the slip. A file of that name that is
+        # plainly something else — a small JSON of the owner's — does not make a copy of a
+        # repository that happens to be named `source`; one that may be a slip does.
+        if self.root.name == "source" and os.path.lexists(container_slip) and slip_file_concern(container_slip):
+            slips.append(container_slip)
+        for slip in slips:
+            if os.path.lexists(slip):
+                return [f"this repository is a copy (it carries an exit slip: {slip}) — copy commands run in the "
+                        "original, where the register is kept"]
+        return []
+
+    def committed_copies(self) -> dict[str, Any]:
+        """The register as the reference branch holds it — what an erasure is judged against.
+
+        Not the working tree: a register edited by hand, or written and never committed, does not
+        authorize anything."""
+        branch = self.copies_reference_branch()
+        if branch is None:
+            return self.load_copies()
+        tip = self.run_git(["rev-parse", "--verify", f"refs/heads/{branch}"])
+        if tip.returncode != 0:
+            raise ProjectControlError(f"cannot resolve the branch that holds the copy register: {branch}")
+        location = f"refs/heads/{branch}:{self.copies_path()}"
+        if self.run_git(["cat-file", "-e", location]).returncode != 0:
+            return self.empty_copies_state()
+        shown = self.run_git(["show", location])
+        if shown.returncode != 0:
+            raise ProjectControlError(f"cannot read the copy register on {branch}: {shown.stderr.strip()}")
+        state = json.loads(shown.stdout)
+        errors = self.copies_register_errors(state)
+        if errors:
+            raise ProjectControlError(f"invalid copy register on {branch}: " + "; ".join(errors))
+        return state
+
+    def copies_register_errors(self, state: Any) -> list[str]:
+        errors = core_schema_errors(state, "copies-state")
+        if errors:
+            return errors
+        template = self.repository_role() == "PROJECT_TEMPLATE"
+        copies = state.get("copies", [])
+        identifiers = [entry.get("copy_id") for entry in copies]
+        if len(identifiers) != len(set(identifiers)):
+            errors.append("duplicate copy identifiers")
+        live: list[tuple[str, str]] = []
+        for entry in copies:
+            identifier = str(entry.get("copy_id"))
+            # The schema's patterns tolerate a final line break; what a script will carry is
+            # checked whole, one line, one way of writing it.
+            if not COPY_ID.fullmatch(identifier):
+                errors.append(f"{identifier!r}: a copy identifier is COPY-NNN")
+                continue
+            path = str(entry.get("path"))
+            errors.extend(f"{identifier}: {error}" for error in copy_path_errors(path))
+            errors.extend(f"{identifier}: origin: {error}"
+                          for error in copy_path_errors(str(entry.get("origin", {}).get("original_path"))))
+            name = str(entry.get("name"))
+            if name != PurePosixPath(path).name:
+                errors.append(f"{identifier}: name differs from the last component of its path")
+            elif not COPY_NAME.fullmatch(name):
+                errors.append(f"{identifier}: {name!r} does not follow <repository>-<usage>-<reference>[-rank]")
+            if not re.fullmatch(r"[a-f0-9]{32}", str(entry.get("token"))):
+                errors.append(f"{identifier}: its token is 32 hexadecimal characters")
+            if entry.get("state") in {"RETURNED", "ERASED"} and entry.get("returns"):
+                last = entry["returns"][-1]
+                if not isinstance(last, dict) or last.get("digest") != entry.get("content_digest") \
+                        or not re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}", str(last.get("original_head"))):
+                    errors.append(f"{identifier}: its last return records the digest it was returned with "
+                                  "and the commit of the original it was proven against (original_head)")
+            ticket = str(entry.get("ticket"))
+            if template and not TEMPLATE_DECISION_ID.fullmatch(ticket):
+                errors.append(f"{identifier}: a copy of the template is opened by a template decision (TPL-D-NNN), not {ticket}")
+            if not template and not HUMAN_DECISION_ID.fullmatch(ticket):
+                errors.append(f"{identifier}: a copy of a project is opened by a Human Decision (HD-NNN), not {ticket}")
+            if template and WORK_ITEM_ID.fullmatch(str(entry.get("closes_with"))):
+                errors.append(f"{identifier}: the template has no Work Item; its copies close with a version")
+            state_value = entry.get("state")
+            digest = entry.get("content_digest")
+            if state_value in {"RETURNED", "ERASED"} and not (isinstance(digest, str) and SHA256_HEX.fullmatch(digest)):
+                errors.append(f"{identifier}: {state_value} requires the content digest recorded at its return")
+            if state_value in {"RETURNED", "ERASED"} and not entry.get("returns"):
+                errors.append(f"{identifier}: {state_value} requires a recorded return")
+            if state_value == "KEPT" and not entry.get("closing_decision"):
+                errors.append(f"{identifier}: KEPT requires the decision that keeps it")
+            if state_value == "ERASED" and not entry.get("closed_at"):
+                errors.append(f"{identifier}: ERASED requires its closing date")
+            if state_value != "ERASED":
+                for other_id, other_path in live:
+                    if paths_overlap(path, other_path):
+                        errors.append(f"{identifier}: its path overlaps {other_id} ({other_path})")
+                live.append((identifier, path))
+        return errors
+
+    def copy_target_closed(self, closes_with: str) -> bool:
+        if WORK_ITEM_ID.fullmatch(closes_with):
+            item = self.work_item_by_id(closes_with)
+            return item is not None and item.get("status") in CLOSED_WORK_ITEM_STATUSES
+        return any(tag["version"] == closes_with for tag in self.version_tags())
+
+    def copies_in_fault(self, state: dict[str, Any]) -> list[dict[str, Any]]:
+        """Copies still OPEN whose Work Item is closed or whose version is tagged."""
+        return [entry for entry in state.get("copies", [])
+                if entry.get("state") == "OPEN" and self.copy_target_closed(str(entry.get("closes_with")))]
+
+    @staticmethod
+    def copies_counts(state: dict[str, Any]) -> dict[str, int]:
+        today = today_iso()
+        copies = state.get("copies", [])
+        return {
+            "open": sum(entry.get("state") == "OPEN" for entry in copies),
+            "late": sum(entry.get("state") == "OPEN" and str(entry.get("due")) < today for entry in copies),
+            "to_erase": sum(entry.get("state") == "RETURNED" and entry.get("fate") in ERASING_FATES for entry in copies),
+            "kept": sum(entry.get("state") == "KEPT" or (entry.get("state") == "RETURNED" and entry.get("fate") == "KEEP")
+                        for entry in copies),
+            "erased": sum(entry.get("state") == "ERASED" for entry in copies),
+            "total": len(copies),
+        }
+
+    def copies_audit(self) -> tuple[str, list[str], list[str]]:
+        """(summary, register errors, copies in fault) for COPIES_REGISTER and COPIES_RETURNED.
+
+        In a copy, the register is the original's as it was when the copy was made — a stale page:
+        judged there, a tag set in a rehearsal would put the copy itself in fault. It is judged in
+        the original only."""
+        if self.copy_guard_errors():
+            return "this repository is a copy: its register is the original's, judged in the original", [], []
+        path = self.root / self.copies_path()
+        if not path.is_file():
+            return "no copy of this repository is registered", [], []
+        try:
+            state = load_json(path)
+        except (OSError, json.JSONDecodeError) as exc:
+            return str(exc), [str(exc)], []
+        errors = self.copies_register_errors(state)
+        if errors:
+            return "; ".join(errors), errors, []
+        try:
+            faults = [
+                f"{entry['copy_id']} ({entry['path']}) is still OPEN but {entry['closes_with']} is closed — "
+                "return every copy in fault in one transaction (copy return), each returned or kept by decision"
+                for entry in self.copies_in_fault(state)
+            ]
+        except (ProjectControlError, OSError, json.JSONDecodeError) as exc:
+            return str(exc), [f"cannot judge the copies' targets: {exc}"], []
+        counts = self.copies_counts(state)
+        summary = (f"{counts['open']} open ({counts['late']} overdue), {counts['to_erase']} to erase, "
+                   f"{counts['kept']} kept, {counts['erased']} erased")
+        return summary, [], faults
+
+    def copy_name_errors(self, declared: str, usage: str) -> list[str]:
+        name = PurePosixPath(declared).name
+        match = COPY_NAME.fullmatch(name)
+        if match is None:
+            return [f"{name}: a copy is named <repository>-<usage>-<reference>[-rank] — usage chantier, revue or "
+                    "repetition; reference a construction site (p21), a version (3.20.2) or a ticket "
+                    "(wi-083, hd-097, tpl-d-080)"]
+        if match.group("usage") != usage:
+            return [f"{name}: the name says {match.group('usage')}, the copy is declared {usage}"]
+        return []
+
+    def copy_frontier_errors(self, declared: str, state: dict[str, Any], own_id: str | None = None) -> list[str]:
+        """A copy is neither the original, nor inside it, nor around it, and overlaps no other copy.
+
+        Judged twice: on the paths as the register names them, and on the real paths this session
+        sees, every link resolved — a copy declared around the original would take it along when
+        erased."""
+        path_errors = copy_path_errors(declared)
+        if path_errors:
+            return path_errors
+        errors: list[str] = []
+        local = copy_local_path(declared)
+        probe = Path(local.anchor or "/")
+        for part in local.parts[1:]:
+            probe = probe / part
+            if probe.is_symlink():
+                errors.append(f"{declared}: {probe} is a symbolic link — a copy's path goes through none")
+                break
+            if not probe.exists():
+                break
+        if not local.parent.is_dir():
+            errors.append(f"{declared}: its parent folder is not reachable from here (volume not mounted?)")
+        original = copy_declared_path(self.root)
+        resolved = os.path.realpath(local)
+        resolved_root = os.path.realpath(self.root)
+        if paths_overlap(declared, original) or paths_overlap(resolved, resolved_root):
+            errors.append(f"{declared}: overlaps the original {original} — a copy is neither the original, "
+                          "nor inside it, nor around it")
+        for entry in state.get("copies", []):
+            if entry.get("copy_id") == own_id or entry.get("state") == "ERASED":
+                continue
+            other = str(entry.get("path"))
+            if paths_overlap(declared, other) or paths_overlap(resolved, os.path.realpath(copy_local_path(other))):
+                errors.append(f"{declared}: overlaps {entry.get('copy_id')} at {other}")
+        return errors
+
+    def template_decisions_text(self) -> str:
+        return (self.root / TEMPLATE_DECISIONS_PATH).read_text(encoding="utf-8")
+
+    def copy_ticket_errors(self, ticket: str, declared: str) -> list[str]:
+        """The decision that opens a copy: valid, and naming the copy's folder on its Folder scope.
+
+        The double stop already produces this decision; the ticket is that decision, nothing more."""
+        template = self.repository_role() == "PROJECT_TEMPLATE"
+        if TEMPLATE_DECISION_ID.fullmatch(ticket):
+            if not template:
+                return [f"{ticket}: a template decision opens only a copy of the template; a project copy is opened by a Human Decision (HD-NNN)"]
+            try:
+                block = template_decision_block(self.template_decisions_text(), ticket)
+            except OSError as exc:
+                return [f"cannot read {TEMPLATE_DECISIONS_PATH}: {exc}"]
+            if block is None:
+                return [f"{ticket}: not recorded in {TEMPLATE_DECISIONS_PATH}, or recorded more than once"]
+            errors = [f"{ticket}: {error}" for error in out_of_folder_decision_errors(block)]
+        elif HUMAN_DECISION_ID.fullmatch(ticket):
+            if template:
+                return [f"{ticket}: the template records its decisions as TPL-D-NNN in {TEMPLATE_DECISIONS_PATH}"]
+            text = self.decisions_text()
+            errors = human_decision_errors(text, ticket)
+            block = decision_block(text, ticket) or ""
+        else:
+            return [f"{ticket}: a ticket is a Human Decision (HD-NNN) or, for the template, a template decision (TPL-D-NNN)"]
+        scopes = [value.strip() for value in re.findall(r"(?m)^Folder scope:[ \t]*(\S.*)$", block)]
+        if len(scopes) != 1 or scopes[0] in {"NOT_APPLICABLE", "NONE", "UNKNOWN"}:
+            errors.append(f"{ticket}: a ticket names the copy's folder on exactly one Folder scope: line, "
+                          "with Confirmation 1: and Confirmation 2:")
+        elif not folder_scope_covers(scopes[0], declared):
+            errors.append(f"{ticket}: its Folder scope names neither {declared} nor a folder that contains it")
+        return errors
+
+    def copy_decision_errors(self, reference: str) -> list[str]:
+        """A decision that keeps a copy, or brings a kept copy back to a return."""
+        template = self.repository_role() == "PROJECT_TEMPLATE"
+        if TEMPLATE_DECISION_ID.fullmatch(reference):
+            if not template:
+                return [f"{reference}: a template decision does not decide for a project"]
+            try:
+                block = template_decision_block(self.template_decisions_text(), reference)
+            except OSError as exc:
+                return [f"cannot read {TEMPLATE_DECISIONS_PATH}: {exc}"]
+            return [] if block is not None else [f"{reference}: not recorded in {TEMPLATE_DECISIONS_PATH}, or recorded more than once"]
+        if HUMAN_DECISION_ID.fullmatch(reference):
+            if template:
+                return [f"{reference}: the template records its decisions as TPL-D-NNN"]
+            return human_decision_errors(self.decisions_text(), reference)
+        return [f"{reference}: a decision is HD-NNN or, for the template, TPL-D-NNN"]
+
+    def copy_target_errors(self, closes_with: str) -> list[str]:
+        if WORK_ITEM_ID.fullmatch(closes_with):
+            if self.repository_role() == "PROJECT_TEMPLATE":
+                return [f"{closes_with}: the template has no Work Item; a copy of the template closes with a version"]
+            item = self.work_item_by_id(closes_with)
+            if item is None:
+                return [f"{closes_with}: unknown Work Item"]
+            if item.get("status") in CLOSED_WORK_ITEM_STATUSES:
+                return [f"{closes_with}: already closed ({item.get('status')}) — a copy closes with work still to come"]
+            return []
+        if SKELETON_VERSION.fullmatch(closes_with):
+            if any(tag["version"] == closes_with for tag in self.version_tags()):
+                return [f"{closes_with}: already tagged — a copy closes with a version still to come"]
+            return []
+        return [f"{closes_with}: --closes-with is a Work Item (WI-NNN) or a version (MAJOR.MINOR.PATCH)"]
+
+    def copy_slip_location(self, entry: dict[str, Any], declared: str | None = None) -> Path:
+        local = copy_local_path(declared or str(entry["path"]))
+        return local / ".git" / COPY_SLIP_NAME if entry["kind"] == "CLONE" else local / COPY_SLIP_NAME
+
+    def copy_identity_errors(self, entry: dict[str, Any], declared: str | None = None) -> list[str]:
+        """Is the folder at the path the copy the register names? Its exit slip says so, with the
+        token issued when the copy was opened. A folder that took the place carries none."""
+        slip = read_copy_slip(self.copy_slip_location(entry, declared))
+        place = declared or entry["path"]
+        if slip is None:
+            return [f"{entry['copy_id']}: no readable exit slip at {place} — the folder there is not this copy, "
+                    f"or its slip ({COPY_SLIP_NAME}) was never placed"]
+        if slip.get("copy_id") != entry["copy_id"] or slip.get("token") != entry["token"]:
+            return [f"{entry['copy_id']}: the exit slip at {place} belongs to another copy"]
+        return []
+
+    def copy_inventory(self, entry: dict[str, Any], declared: str | None = None) -> tuple[dict[str, str], list[str]]:
+        local = copy_local_path(declared or str(entry["path"]))
+        if entry["kind"] == "CLONE":
+            return clone_inventory(local)
+        commit = entry["origin"]["commit"]
+        listed = self.run_git(["ls-tree", "-r", "-z", commit], text=False)
+        if listed.returncode != 0:
+            return {}, [f"{entry['copy_id']}: the original no longer has the exported commit {commit}"]
+        expected: dict[str, tuple[str, str]] = {}
+        for record in split_nul(listed.stdout):
+            meta, _, relative = record.partition("\t")
+            fields = meta.split()
+            if len(fields) == 3 and fields[1] == "blob":
+                expected[relative] = (fields[0], fields[2])
+            elif len(fields) == 3:
+                return {}, [f"{entry['copy_id']}: the exported commit holds a {fields[1]} ({relative}); not supported"]
+        shown_format = self.run_git(["rev-parse", "--show-object-format"])
+        object_format = shown_format.stdout.strip() if shown_format.returncode == 0 and shown_format.stdout.strip() else "sha1"
+        items, refusals = export_inventory(local, expected, object_format)
+        # An intact `source/` holds the files of the exported revision: they are safe only while
+        # the original keeps that revision. It is an item like a reference of a clone — kept by a
+        # branch or a tag of the original, or abandoned by name.
+        items[f"origin:{commit}"] = f"commit:{commit}"
+        return items, refusals
+
+    def original_known_commits(self) -> set[str]:
+        """Every commit the original keeps: reachable from one of its branches or tags.
+
+        Nothing else counts. A remote-tracking reference goes when its remote is removed, a
+        reflog entry expires, a detached HEAD moves on: a commit the original reaches only that
+        way can disappear before the copy is erased."""
+        listed = self.run_git(["rev-list", "--branches", "--tags"])
+        if listed.returncode != 0:
+            raise ProjectControlError(f"cannot list the original's commits: {listed.stderr.strip()}")
+        return set(listed.stdout.split())
+
+    def original_reference_objects(self) -> set[str]:
+        """The objects the original's branches and tags name — an annotated tag is one."""
+        return set(self.git_lines(["for-each-ref", "--format=%(objectname)", "refs/heads", "refs/tags"]))
+
+    @staticmethod
+    def covered_by_the_original(items: dict[str, str], known_commits: set[str], reference_objects: set[str]) -> set[str]:
+        """The reference and commit items the original keeps on a branch or a tag."""
+        covered: set[str] = set()
+        for name, value in items.items():
+            kind, _, oid = value.partition(":")
+            if name.split(":", 1)[0] in {"ref", "head", "reflog", "origin"}:
+                if (kind == "commit" and oid in known_commits) or (kind == "tag" and oid in reference_objects):
+                    covered.add(name)
+        return covered
+
+    def copy_coverage_errors(self, entry: dict[str, Any], items: dict[str, str]) -> list[str]:
+        """Is everything the copy holds still back in the original, or abandoned by name?
+
+        Judged again right before an erasure, on the proofs recorded at the return: a branch of
+        the original deleted since, a history rewritten, a file proof whose commit the original
+        no longer keeps — the copy is not erased."""
+        last = entry["returns"][-1]
+        known_commits = self.original_known_commits()
+        covered = self.covered_by_the_original(items, known_commits, self.original_reference_objects())
+        errors: list[str] = []
+        original_head = str(last.get("original_head"))
+        files = last.get("files", []) or []
+        if files and original_head not in known_commits:
+            errors.append(f"the commit {original_head[:7]} where the returned files were proven is no longer on a "
+                          "branch or a tag of the original")
+        elif files:
+            for proof in files:
+                shown = self.run_git(["show", f"{original_head}:{proof.get('path')}"], text=False)
+                if shown.returncode != 0 or hashlib.sha256(shown.stdout).hexdigest() != proof.get("sha256"):
+                    errors.append(f"{proof.get('item')}: {proof.get('path')} no longer holds the returned bytes at {original_head[:7]}")
+                else:
+                    covered.add(str(proof.get("item")))
+        for proof in last.get("abandon", []) or []:
+            covered.update(abandoned_items(str(proof.get("item", "")), items))
+        uncovered = sorted(name for name in items if name not in covered)
+        if uncovered:
+            shown_items = ", ".join(uncovered[:20]) + (f" … and {len(uncovered) - 20} more" if len(uncovered) > 20 else "")
+            errors.append(f"{len(uncovered)} item(s) no longer kept by a branch or a tag of the original, nor "
+                          f"abandoned by name: {shown_items}")
+        return errors
+
+    def prepare_copies_mutation(self, command: str, *, repairing: bool = False) -> str | None:
+        """Where and how a `copy` command may write the register. Returns the branch to commit on.
+
+        Same rules as every administrative write: a valid mode, an audit that passes — except, for
+        a repair, the copies in fault it comes to repair — and, where the register is committed,
+        the checkout of that branch, at its tip, on a clean worktree."""
+        guard = self.copy_guard_errors()
+        if guard:
+            raise ProjectControlError(f"{command} refused: " + "; ".join(guard))
+        here = copy_declared_path(self.root)
+        others = sorted({str(entry.get("origin", {}).get("original_path")) for entry in self.load_copies().get("copies", [])}
+                        - {here})
+        if others:
+            # Any clone carries the register it was cloned with. Only the original that wrote it
+            # changes it: from elsewhere, a closure would be claimed that the original never made.
+            raise ProjectControlError(
+                f"{command} refused: this repository ({here}) did not register these copies — its register is "
+                f"inherited from the original at {', '.join(others)}; copy commands run in the original, where it stands")
+        mode = self.operating_mode()
+        if mode not in {"NORMAL_MODE", "BOOTSTRAP_MODE"}:
+            raise ProjectControlError(f"{command} requires a valid FIRST_START status, got {mode}")
+        if repairing:
+            failures = [f"{item.check}: {item.detail}" for item in self.audit_findings()
+                        if item.status == "FAIL" and item.check != "COPIES_RETURNED"]
+            if failures:
+                raise ProjectControlError("audit refused the copy register mutation: " + "; ".join(failures))
+        else:
+            self.validate_clean_administrative_baseline()
+        branch = self.copies_reference_branch()
+        if branch is None:
+            return None
+        if mode == "NORMAL_MODE":
+            self.require_canonical_checkout(command)
+        else:
+            context = self.repository_context()
+            if context["branch"] != branch:
+                raise ProjectControlError(
+                    f"{command} runs on {branch}, where the template keeps its copy register; current branch {context['branch']}")
+        self.require_clean_worktree(command)
+        return branch
+
+    def write_copies(self, state: dict[str, Any], branch: str | None, message: str, *, audit_must_pass: bool = False) -> None:
+        """Write the register, check it, commit it where it lives — or leave nothing behind."""
+        state["updated_at"] = now_iso()
+        transaction = FileTransaction(self.root)
+        committed: tuple[str, str] | None = None
+        try:
+            transaction.write_json(self.copies_path(), state)
+            errors = self.copies_register_errors(state)
+            if errors:
+                raise ProjectControlError("copy register refused: " + "; ".join(errors))
+            if audit_must_pass:
+                failures = [f"{item.check}: {item.detail}" for item in self.audit_findings() if item.status == "FAIL"]
+                if failures:
+                    raise ProjectControlError("the register would leave the audit failing: " + "; ".join(failures))
+            if branch is not None:
+                committed = self.commit_records(transaction, message)
+            transaction.commit()
+        except BaseException as exc:
+            if committed is not None:
+                rollback_errors = self.uncommit_records(transaction, str(branch), *committed)
+                if rollback_errors:
+                    raise ProjectControlError(f"{message} failed: {exc}; ROLLBACK FAILED: {'; '.join(rollback_errors)}") from exc
+            else:
+                transaction.rollback()
+            raise
+
+    def copy_entry(self, state: dict[str, Any], copy_id: str) -> dict[str, Any]:
+        matches = [entry for entry in state.get("copies", []) if entry.get("copy_id") == copy_id]
+        if len(matches) != 1:
+            raise ProjectControlError(f"unknown copy: {copy_id}")
+        return matches[0]
+
+    def open_copy(self, args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any], str]:
+        """`copy open`: register a copy before it is made. Returns (entry, exit slip, slip path)."""
+        branch = self.prepare_copies_mutation("copy open")
+        state = self.load_copies()
+        declared = clean_cli_text(args.path, "--path")
+        errors: list[str] = []
+        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", str(args.due)):
+            errors.append("--due must be YYYY-MM-DD")
+        errors.extend(self.copy_frontier_errors(declared, state))
+        if not errors:
+            errors.extend(self.copy_name_errors(declared, args.usage))
+        errors.extend(self.copy_ticket_errors(args.ticket.upper(), declared))
+        closes_with = args.closes_with.strip()
+        if WORK_ITEM_ID.fullmatch(closes_with.upper()):
+            closes_with = closes_with.upper()
+        errors.extend(self.copy_target_errors(closes_with))
+        origin = self.run_git(["rev-parse", "--verify", f"{args.origin}^{{commit}}"])
+        if origin.returncode != 0:
+            errors.append(f"--origin {args.origin}: not a commit of the original")
+        if errors:
+            raise ProjectControlError("copy open refused: " + "; ".join(errors))
+        tag = args.origin if self.run_git(["rev-parse", "--verify", "--quiet", f"refs/tags/{args.origin}"]).returncode == 0 else None
+        roots = self.git_lines(["rev-list", "--max-parents=0", "HEAD"])
+        numbers = [int(str(entry["copy_id"])[5:]) for entry in state.get("copies", [])]
+        entry = {
+            "copy_id": f"COPY-{(max(numbers) + 1 if numbers else 1):03d}",
+            "name": PurePosixPath(declared).name, "path": declared, "kind": args.kind, "usage": args.usage,
+            "ticket": args.ticket.upper(),
+            "closes_with": closes_with,
+            "origin": {"original_path": copy_declared_path(self.root), "commit": origin.stdout.strip(),
+                       "tag": tag, "root_commit": roots[-1] if roots else origin.stdout.strip()},
+            "fate": args.fate, "due": args.due, "opened_at": now_iso(), "token": secrets.token_hex(16),
+            "state": "OPEN", "returns": [], "content_digest": None, "moves": [], "closed_at": None,
+            "closing_decision": None,
+        }
+        state.setdefault("copies", []).append(entry)
+        self.write_copies(state, branch, f"chore(project-control): copy {entry['copy_id']} opened")
+        slip = {
+            "copy_id": entry["copy_id"], "token": entry["token"], "name": entry["name"], "kind": entry["kind"],
+            "usage": entry["usage"], "original": entry["origin"]["original_path"], "path": declared,
+            "ticket": entry["ticket"], "closes_with": entry["closes_with"], "fate": entry["fate"],
+            "due": entry["due"], "issued_at": entry["opened_at"],
+        }
+        slip_path = f"{declared}/.git/{COPY_SLIP_NAME}" if entry["kind"] == "CLONE" else f"{declared}/{COPY_SLIP_NAME}"
+        return entry, slip, slip_path
+
+    def return_copies(self, proofs_path: Path) -> list[str]:
+        """`copy return --proofs FILE`: prove that everything the copies hold came back or is abandoned.
+
+        One transaction for one or several copies. When the audit already fails because copies
+        stayed OPEN after their Work Item or version closed, the transaction must cover every one
+        of them — returned, or kept by decision — and leave the audit passing: the commit gate
+        refuses any commit whose audit fails, so a repair copy by copy could never be recorded."""
+        try:
+            payload = load_json(proofs_path)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ProjectControlError(f"cannot read the proofs file {proofs_path}: {exc}") from exc
+        requests = payload.get("returns") if isinstance(payload, dict) else None
+        if not isinstance(requests, list) or not requests:
+            raise ProjectControlError('the proofs file holds {"returns": [{"copy_id": "COPY-NNN", "files": [...], "abandon": [...]}, ...]}')
+        branch = self.prepare_copies_mutation("copy return", repairing=True)
+        state = self.load_copies()
+        requested = [str(request.get("copy_id", "")).upper() if isinstance(request, dict) else "" for request in requests]
+        if len(requested) != len(set(requested)):
+            raise ProjectControlError("a copy appears twice in the proofs file")
+        in_fault = [entry["copy_id"] for entry in self.copies_in_fault(state)]
+        missing = [identifier for identifier in in_fault if identifier not in requested]
+        if missing:
+            raise ProjectControlError(
+                "copies in fault must be repaired together, in one transaction (the commit gate refuses a "
+                f"register that still leaves one in fault): add {', '.join(missing)} to the proofs file")
+        known_commits: set[str] | None = None
+        reference_objects: set[str] | None = None
+        head = self.repository_context()["head"]
+        refusals: list[str] = []
+        for request in requests:
+            if not isinstance(request, dict):
+                refusals.append("each entry of returns is an object")
+                continue
+            entry = self.copy_entry(state, str(request.get("copy_id", "")).upper())
+            identifier = entry["copy_id"]
+            keep = request.get("keep_decision")
+            if keep is not None:
+                if entry["state"] not in {"OPEN", "RETURNED"}:
+                    refusals.append(f"{identifier}: only an OPEN or RETURNED copy can be kept, not {entry['state']}")
+                    continue
+                decision_errors = self.copy_decision_errors(str(keep).upper())
+                if decision_errors:
+                    refusals.extend(f"{identifier}: {error}" for error in decision_errors)
+                    continue
+                entry.update(state="KEPT", closing_decision=str(keep).upper(), closed_at=now_iso())
+                continue
+            if entry["state"] == "KEPT":
+                reopening = request.get("decision")
+                if not reopening:
+                    refusals.append(f"{identifier}: a KEPT copy comes back to a return only by decision (\"decision\": \"HD-NNN\")")
+                    continue
+                decision_errors = self.copy_decision_errors(str(reopening).upper())
+                if decision_errors:
+                    refusals.extend(f"{identifier}: {error}" for error in decision_errors)
+                    continue
+            elif entry["state"] not in {"OPEN", "RETURNED"}:
+                refusals.append(f"{identifier}: an {entry['state']} copy has nothing left to return")
+                continue
+            identity_errors = self.copy_identity_errors(entry)
+            if identity_errors:
+                refusals.extend(identity_errors)
+                continue
+            items, unsupported = self.copy_inventory(entry)
+            if unsupported:
+                refusals.extend(f"{identifier}: {reason}" for reason in unsupported)
+                continue
+            if known_commits is None:
+                known_commits = self.original_known_commits()
+                reference_objects = self.original_reference_objects()
+            covered: dict[str, str] = {
+                name: "covered" for name in self.covered_by_the_original(items, known_commits, reference_objects or set())
+            }
+            files = request.get("files", []) or []
+            abandons = request.get("abandon", []) or []
+            file_proofs: list[dict[str, Any]] = []
+            abandon_proofs: list[dict[str, Any]] = []
+            roles: set[str] = set()
+            for proof in files:
+                item = str(proof.get("item", "")) if isinstance(proof, dict) else ""
+                target = safe_relative_path(str(proof.get("path", ""))) if isinstance(proof, dict) else None
+                role = str(proof.get("role", "")) if isinstance(proof, dict) else ""
+                if item not in items:
+                    refusals.append(f"{identifier}: file proof for {item!r}, which the copy does not hold")
+                    continue
+                if target is None:
+                    refusals.append(f"{identifier}: {item}: the file proof names no safe path of the original")
+                    continue
+                if role not in COPY_PROOF_ROLES:
+                    refusals.append(f"{identifier}: {item}: role must be one of {', '.join(COPY_PROOF_ROLES)}")
+                    continue
+                recorded = self.run_git(["show", f"{head}:{target}"], text=False)
+                if recorded.returncode != 0:
+                    refusals.append(f"{identifier}: {item}: {target} is not committed in the original at {head[:7]}")
+                    continue
+                expected = items[item]
+                if expected.startswith("blob:"):
+                    matches = blob_digest(recorded.stdout) == expected[5:]
+                else:
+                    matches = hashlib.sha256(recorded.stdout).hexdigest() == expected
+                if not matches:
+                    refusals.append(f"{identifier}: {item}: {target} is committed in the original with other bytes")
+                    continue
+                covered[item] = "file"
+                roles.add(role)
+                file_proofs.append({"item": item, "path": target, "role": role, "sha256": hashlib.sha256(recorded.stdout).hexdigest()})
+            for proof in abandons:
+                item = str(proof.get("item", "")) if isinstance(proof, dict) else ""
+                reason = str(proof.get("reason", "")).strip() if isinstance(proof, dict) else ""
+                if not item or not reason:
+                    refusals.append(f"{identifier}: an abandon names its item and its reason")
+                    continue
+                matched = abandoned_items(item, items)
+                if not matched:
+                    refusals.append(f"{identifier}: abandon of {item!r}, which the copy does not hold")
+                    continue
+                for name in matched:
+                    covered.setdefault(name, "abandon")
+                abandon_proofs.append({"item": item, "reason": reason, "count": len(matched)})
+            uncovered = sorted(name for name in items if name not in covered)
+            if uncovered:
+                shown = ", ".join(uncovered[:40]) + (f" … and {len(uncovered) - 40} more" if len(uncovered) > 40 else "")
+                refusals.append(f"{identifier}: {len(uncovered)} item(s) neither back in the original nor abandoned by name: {shown}")
+                continue
+            if entry["usage"] == "revue" and "mandat" not in roles:
+                refusals.append(f"{identifier}: a review comes back with the mandate that commissioned it (a file proof with role \"mandat\")")
+                continue
+            digest = inventory_digest(items)
+            entry["returns"].append({
+                "returned_at": now_iso(), "digest": digest, "items": len(items),
+                "covered_by_the_original": sum(value == "covered" for value in covered.values()),
+                "original_head": head, "files": file_proofs, "abandon": abandon_proofs,
+                "decision": str(request.get("decision")).upper() if entry["state"] == "KEPT" else None,
+            })
+            entry.update(state="RETURNED", content_digest=digest, closed_at=None, closing_decision=None)
+        if refusals:
+            raise ProjectControlError("copy return refused: " + "; ".join(refusals))
+        identifiers = ", ".join(requested)
+        self.write_copies(state, branch, f"chore(project-control): copy {identifiers} returned", audit_must_pass=True)
+        return requested
+
+    def check_copy(self, copy_id: str, declared: str, digest: str) -> list[Finding]:
+        """`copy check`: may this exact folder be erased now? Read-only; the erasure script runs it
+        right before erasing, with the path, and the digest it was written for.
+
+        The order matters. The register and the original first; then the folder's content, then
+        whether the original still keeps what the copy held; the place — the path and the exit
+        slip found there — last, as close to the erasure as the check can be. The place is also
+        looked at once before the long part, so that a folder that is not the copy is never walked."""
+        findings: list[Finding] = []
+        guard = self.copy_guard_errors()
+        if guard:
+            add(findings, "COPY_ORIGINAL", False, "; ".join(guard))
+            return findings
+        try:
+            state = self.committed_copies()
+            entry = self.copy_entry(state, copy_id)
+        except (ProjectControlError, OSError, ValueError) as exc:
+            add(findings, "COPY_REGISTER", False, str(exc))
+            return findings
+        here = copy_declared_path(self.root)
+        original = str(entry["origin"]["original_path"])
+        add(findings, "COPY_ORIGINAL", here == original,
+            f"this repository is the original that registered {copy_id}" if here == original
+            else f"{copy_id} was registered by the original at {original}, not by this repository ({here}) — "
+                 "run the check from the original")
+        if here != original:
+            return findings
+        erasable = entry["state"] == "RETURNED" and entry["fate"] in ERASING_FATES
+        add(findings, "COPY_STATE", erasable,
+            f"{copy_id} is RETURNED with fate {entry['fate']}" if erasable
+            else f"{copy_id} is {entry['state']} with fate {entry['fate']}: nothing to erase")
+        bound = entry["path"] == declared and entry["content_digest"] == digest
+        add(findings, "COPY_BINDING", bound,
+            f"the register names {declared} with this digest" if bound
+            else f"the register now names {entry['path']} with digest {str(entry['content_digest'])[:12]}…: "
+                 "this script was written for another state — regenerate it (copy cleanup)")
+        if not erasable or not bound:
+            return findings
+
+        def place() -> tuple[list[str], list[str]]:
+            return self.copy_frontier_errors(declared, state, own_id=copy_id), self.copy_identity_errors(entry)
+
+        def judge_place(frontier: list[str], identity: list[str]) -> None:
+            add(findings, "COPY_FRONTIER", not frontier,
+                "the folder is neither the original nor around it, and overlaps no other copy" if not frontier
+                else "; ".join(frontier))
+            add(findings, "COPY_IDENTITY", not identity,
+                "the exit slip at the path belongs to this copy" if not identity else "; ".join(identity))
+
+        frontier, identity = place()
+        if frontier or identity:
+            judge_place(frontier, identity)
+            return findings
+        items, unsupported = self.copy_inventory(entry)
+        current = inventory_digest(items)
+        same = not unsupported and current == digest
+        add(findings, "COPY_CONTENT", same,
+            "the folder holds exactly what was returned" if same
+            else ("; ".join(unsupported) if unsupported else
+                  f"the folder changed since its return (digest {current[:12]}…): return it again (copy return) before erasing"))
+        if not same:
+            return findings
+        try:
+            coverage = self.copy_coverage_errors(entry, items)
+        except (ProjectControlError, OSError) as exc:
+            coverage = [str(exc)]
+        add(findings, "COPY_COVERAGE", not coverage,
+            "everything it held is still kept by a branch or a tag of the original, or abandoned by name"
+            if not coverage else "; ".join(coverage))
+        if coverage:
+            return findings
+        judge_place(*place())
+        return findings
+
+    def move_copy(self, copy_id: str, declared: str) -> dict[str, Any]:
+        """`copy move`: the folder was moved; the register follows, and every script written
+        for its old place stops passing `copy check`."""
+        branch = self.prepare_copies_mutation("copy move")
+        state = self.load_copies()
+        entry = self.copy_entry(state, copy_id)
+        if entry["state"] == "ERASED":
+            raise ProjectControlError(f"{copy_id}: an erased copy does not move")
+        declared = clean_cli_text(declared, "--path")
+        errors = self.copy_frontier_errors(declared, state, own_id=copy_id)
+        if not errors:
+            errors.extend(self.copy_name_errors(declared, entry["usage"]))
+            errors.extend(self.copy_ticket_errors(entry["ticket"], declared))
+        if declared == entry["path"]:
+            errors.append(f"{copy_id} is already registered at {declared}")
+        old_slip = read_copy_slip(self.copy_slip_location(entry))
+        if old_slip is not None and old_slip.get("token") == entry["token"]:
+            errors.append(f"{copy_id} is still at {entry['path']}: move the folder first, then record it")
+        errors.extend(self.copy_identity_errors(entry, declared))
+        # A move authorizes nothing: `copy check` still compares the folder with what was returned
+        # before any erasure, at its new place as at the old one.
+        if errors:
+            raise ProjectControlError("copy move refused: " + "; ".join(errors))
+        entry["moves"].append({"from": entry["path"], "to": declared, "moved_at": now_iso()})
+        entry.update(path=declared, name=PurePosixPath(declared).name)
+        self.write_copies(state, branch, f"chore(project-control): copy {copy_id} moved")
+        return entry
+
+    def close_copy(self, copy_id: str, closing_state: str, decision: str | None) -> dict[str, Any]:
+        """`copy close`: ERASED once the folder is gone; KEPT, by decision, while it stays."""
+        branch = self.prepare_copies_mutation("copy close")
+        state = self.load_copies()
+        entry = self.copy_entry(state, copy_id)
+        local = copy_local_path(entry["path"])
+        if closing_state == "ERASED":
+            if entry["state"] != "RETURNED" or entry["fate"] not in ERASING_FATES:
+                raise ProjectControlError(f"{copy_id}: only a RETURNED copy whose fate is to be erased can be ERASED; it is {entry['state']}, fate {entry['fate']}")
+            if not local.parent.is_dir():
+                raise ProjectControlError(f"{copy_id}: {entry['path']} is unavailable from here (volume not mounted?) — unavailable is not erased")
+            if os.path.lexists(local):
+                raise ProjectControlError(f"{copy_id}: {entry['path']} still exists — the car is still there")
+            entry.update(state="ERASED", closed_at=now_iso())
+        else:
+            if not decision:
+                raise ProjectControlError(f"{copy_id}: KEPT requires --decision, the decision that keeps it")
+            if entry["state"] not in {"OPEN", "RETURNED"}:
+                raise ProjectControlError(f"{copy_id}: only an OPEN or RETURNED copy can be kept, not {entry['state']}")
+            decision_errors = self.copy_decision_errors(decision.upper())
+            if decision_errors:
+                raise ProjectControlError("copy close refused: " + "; ".join(decision_errors))
+            if not local.is_dir():
+                raise ProjectControlError(f"{copy_id}: {entry['path']} is not there — a kept copy is a folder that stays")
+            entry.update(state="KEPT", closing_decision=decision.upper(), closed_at=now_iso())
+        self.write_copies(state, branch, f"chore(project-control): copy {copy_id} {closing_state.lower()}")
+        return entry
+
+    def copies_cleanup_script(self, output: Path) -> list[str]:
+        """`copy cleanup --output FILE`: the script the Project Owner runs to erase the returned
+        copies. The controller erases nothing; the script checks each folder right before erasing
+        it and stops at the first refusal.
+
+        The script carries no name the register holds — only identifiers, fixed words and quoted
+        paths — and it runs with no path map: it erases the folder its check looked at."""
+        guard = self.copy_guard_errors()
+        if guard:
+            raise ProjectControlError("copy cleanup refused: " + "; ".join(guard))
+        state = self.committed_copies()
+        output = output if output.is_absolute() else Path.cwd() / output
+        if os.path.lexists(output):
+            raise ProjectControlError(f"{output} already exists — the script is never written over a file")
+        folder, repository = os.path.realpath(output.parent), os.path.realpath(self.root)
+        if folder == repository or folder.startswith(repository + "/"):
+            raise ProjectControlError("the script is written outside the repository, so that it never enters a commit")
+        entries = [entry for entry in state.get("copies", [])
+                   if entry.get("state") == "RETURNED" and entry.get("fate") in ERASING_FATES]
+        original = copy_declared_path(self.root)
+        errors = copy_path_errors(original, "this repository's path")
+        errors.extend(f"{entry['copy_id']}: registered by the original at {entry['origin']['original_path']}, not by "
+                      f"this repository ({original})" for entry in entries
+                      if entry["origin"]["original_path"] != original)
+        if errors:
+            raise ProjectControlError("copy cleanup refused: " + "; ".join(errors))
+        lines = [
+            "#!/usr/bin/env bash",
+            f"# Généré par « project_control.py copy cleanup » le {now_iso()}, depuis l'original.",
+            "# CONDITION : pendant que ce script tourne, personne ni aucun programme n'écrit dans les dossiers",
+            "# ci-dessous (agent, éditeur, synchronisation, sauvegarde). Chaque dossier est contrôlé juste",
+            "# avant d'être effacé ; le script s'arrête au premier refus, sans rien effacer de plus.",
+            "set -euo pipefail",
+            "# Les chemins sont ceux du poste : aucune table de correspondance, aucun dépôt désigné d'ailleurs.",
+            "unset PROJECT_CONTROL_PATH_MAP GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY "
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE GIT_CEILING_DIRECTORIES",
+            f"cd -- {shlex.quote(original)}",
+        ]
+        if not entries:
+            lines.append('echo "Aucune copie rendue n\'attend d\'être effacée."')
+        for entry in entries:
+            path = shlex.quote(entry["path"])
+            parent = shlex.quote(str(PurePosixPath(entry["path"]).parent))
+            name = shlex.quote(PurePosixPath(entry["path"]).name)
+            refused = shlex.quote("Pas effacé : " + entry["path"] + " — son dossier parent n'est plus celui qui a été contrôlé")
+            lines.extend([
+                "",
+                f"# --- {entry['copy_id']} ({entry['kind']}, {entry['usage']}), rendue, sort {entry['fate']}",
+                f"python3 -B scripts/project_control.py copy check {entry['copy_id']} --path {path} "
+                f"--digest {entry['content_digest']}",
+                "# L'effacement part du dossier parent, épinglé et vérifié : un lien glissé plus haut ne le détourne pas.",
+                f"( cd -P -- {parent} && [ \"$(pwd -P)\" = {parent} ] && rm -rf -- {name} ) || {{ echo {refused} >&2; exit 1; }}",
+                f"if [ -e {path} ] || [ -L {path} ]; then echo {shlex.quote('Pas effacé en entier : ' + entry['path'])} >&2; exit 1; fi",
+                f"echo {shlex.quote('Effacé : ' + entry['path'])}",
+                f"echo {shlex.quote('À enregistrer depuis l’original : python3 -B scripts/project_control.py copy close ' + entry['copy_id'] + ' --state ERASED')}",
+            ])
+        output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        output.chmod(0o755)
+        return [entry["copy_id"] for entry in entries]
+
+    def copy_slip_banner(self) -> dict[str, Any] | None:
+        """What `status` says in a copy: the exit slip it carries, and whether it is still where
+        the slip was issued for. Nothing in a repository that carries no slip — the original."""
+        git_dir = self.root / ".git"
+        if not git_dir.is_dir():
+            return None
+        slip = read_copy_slip(git_dir / COPY_SLIP_NAME)
+        if slip is None or not all(slip.get(key) for key in ("original", "path", "ticket", "due", "issued_at")):
+            return None
+        here = copy_declared_path(self.root)
+        return {"original": slip["original"], "path": slip["path"], "ticket": slip["ticket"], "due": slip["due"],
+                "issued_at": str(slip["issued_at"])[:10], "copy_id": slip.get("copy_id"), "moved": here != slip["path"]}
+
     # --- Roadmap view (P12, P6): computed from the repository's files, rendered by ---
     # --- scripts/roadmap_view.py; it displays and never decides.                    ---
 
@@ -2516,13 +4137,14 @@ class ProjectControl:
     def roadmap_view_sources(self) -> list[str]:
         paths = self.view_paths()
         if self.repository_role() == "PROJECT_TEMPLATE":
-            candidates = [TEMPLATE_ROADMAP_PATH, paths["settings"], "provenance/CHANGELOG.md", CORE_MANIFEST_PATH]
+            candidates = [TEMPLATE_ROADMAP_PATH, paths["settings"], "provenance/CHANGELOG.md", CORE_MANIFEST_PATH,
+                          TEMPLATE_COPIES_JSON_PATH]
         else:
             candidates = [
                 "docs/governance/roadmap-state.v1.json", "docs/governance/ROADMAP.md",
                 "docs/governance/HUMAN_DECISIONS.md", IDEAS_JSON_PATH, IDEAS_MD_PATH,
                 "project_control/project-state.v1.json", paths["settings"],
-                "docs/governance/REPOSITORY_STATUS.md", CORE_MANIFEST_PATH,
+                "docs/governance/REPOSITORY_STATUS.md", CORE_MANIFEST_PATH, COPIES_JSON_PATH,
                 *(str(path.relative_to(self.root)) for path in self.record_files("project_control/work-items")),
             ]
         return sorted(path for path in dict.fromkeys(candidates) if (self.root / path).is_file())
@@ -2723,7 +4345,7 @@ class ProjectControl:
         # The state is already known: testing a translated prefix made an up-to-date backup
         # read as an alert in English.
         backups_ok = self._backups_ok
-        return [
+        rows = [
             [speak(tongue, "banner.checked_on"), self.roadmap_view_module().written_date(view["generated_at"], tongue), "v"],
             [speak(tongue, "banner.how"), speak(tongue, "banner.how_detail"), "v"],
             [speak(tongue, "banner.version"), version, "v"],
@@ -2731,6 +4353,16 @@ class ProjectControl:
             [speak(tongue, "banner.checks"), checks, "ok" if audit_ok else "ko"],
             [speak(tongue, "banner.refresh"), view["settings"]["regeneration_label"] + speak(tongue, "banner.on_demand"), "v"],
         ]
+        # The copies of the repository (P21): shown once there is a register, never before.
+        try:
+            copies = self.load_copies() if (self.root / self.copies_path()).is_file() else None
+        except (ProjectControlError, OSError, ValueError):
+            copies = None
+        if copies is not None and copies.get("copies"):
+            counts = self.copies_counts(copies)
+            rows.append([speak(tongue, "banner.copies"), speak(tongue, "copies.summary", **counts),
+                         "ok" if not counts["late"] else "ko"])
+        return rows
 
     def _template_view(self, view: dict[str, Any], roadmap: dict[str, Any], backups: str, module: Any) -> None:
         template = roadmap["template"]
@@ -4141,6 +5773,13 @@ class ProjectControl:
             add(findings, check, ok, detail)
             mode_findings, audited = self.staged_state_findings(mode, staged)
         elif mode == "BOOTSTRAP_MODE":
+            if self.repository_role() == "PROJECT_TEMPLATE" and TEMPLATE_COPIES_JSON_PATH in staged:
+                # The template has no canonical branch declared: its copy register lives on main,
+                # where `copy` commands write it — a work branch never carries it (P21).
+                on_main = context["branch"] == "main" or self.merge_in_progress()
+                add(findings, "TEMPLATE_COPIES_ON_MAIN", on_main,
+                    f"{TEMPLATE_COPIES_JSON_PATH} is committed on main" if on_main else
+                    f"{TEMPLATE_COPIES_JSON_PATH} is kept on main by the copy commands, not on {context['branch']}")
             mode_findings, audited = self.staged_state_findings(mode, staged)
         else:
             mode_findings, audited = [], "nothing"
@@ -6380,7 +8019,14 @@ class ProjectControl:
             roadmap_view = self.roadmap_view_state()
         except (ProjectControlError, OSError, ValueError):
             roadmap_view = "UNKNOWN"
+        copies: dict[str, int] | None = None
+        try:
+            if (self.root / self.copies_path()).is_file():
+                copies = self.copies_counts(self.load_copies())
+        except (ProjectControlError, OSError, ValueError):
+            copies = None
         return {"read_only": True, "mode": mode, "project_name": project["project_name"],
+                "copy_slip": self.copy_slip_banner(), "copies": copies,
                 "roadmap_view_inherited": self.roadmap_view_is_inherited(),
                 **self.repository_context(), "audit_status": "FAIL" if failures else "PASS",
                 "hooks": self.commit_gate_state(),
@@ -6394,6 +8040,13 @@ class ProjectControl:
         if self.operating_mode() != "NORMAL_MODE":
             raise ProjectControlError("close is available only in NORMAL_MODE")
         self.validate_clean_administrative_baseline()
+        # Closing the work is giving the keys back: a copy made for this Work Item and still OPEN
+        # holds work that may not be anywhere else (P21).
+        still_out = [f"{entry['copy_id']} ({entry['path']})" for entry in self.load_copies().get("copies", [])
+                     if entry.get("state") == "OPEN" and entry.get("closes_with") == work_item_id]
+        if still_out:
+            raise ProjectControlError(
+                f"{work_item_id} still has copies OPEN: {', '.join(still_out)} — return them first (copy return)")
         item = self.work_item_by_id(work_item_id)
         if item is None:
             raise ProjectControlError(f"unknown Work Item: {work_item_id}")
@@ -6818,6 +8471,38 @@ def command_main(argv: Sequence[str] | None = None) -> int:
     idea_set.add_argument("--state", choices=IDEA_STATES)
     idea_set.add_argument("--target", help="WI-NNN, version or HD-NNN; empty string clears it.")
     idea_set.add_argument("--note", help="One line; empty string clears it.")
+    copy_parser = subparsers.add_parser(
+        "copy",
+        help="The copies of this repository (P21, tableau des clés): open, return, check, move, close, cleanup.",
+    )
+    copy_commands = copy_parser.add_subparsers(dest="copy_command", required=True)
+    copy_open = copy_commands.add_parser("open", help="Register a copy before making it; prints the exit slip to place in it.")
+    copy_open.add_argument("--path", required=True, help="Absolute path of the copy, as the Project Owner names it.")
+    copy_open.add_argument("--kind", required=True, choices=COPY_KINDS)
+    copy_open.add_argument("--usage", required=True, choices=COPY_USAGES)
+    copy_open.add_argument("--ticket", required=True,
+                           help="HD-NNN (project) or TPL-D-NNN (template) whose Folder scope names the copy.")
+    copy_open.add_argument("--closes-with", dest="closes_with", required=True, help="WI-NNN or MAJOR.MINOR.PATCH.")
+    copy_open.add_argument("--fate", required=True, choices=COPY_FATES)
+    copy_open.add_argument("--due", required=True, help="YYYY-MM-DD")
+    copy_open.add_argument("--origin", default="HEAD", help="Revision copied; for an EXPORT, the exported revision.")
+    copy_return = copy_commands.add_parser(
+        "return", help="Prove that what the copies hold came back or is abandoned by name (JSON proofs file).")
+    copy_return.add_argument("--proofs", required=True, help="JSON file, kept outside the repository.")
+    copy_check = copy_commands.add_parser("check", help="Read-only: may this exact folder be erased now?")
+    copy_check.add_argument("copy_id", help="COPY-NNN")
+    copy_check.add_argument("--path", required=True)
+    copy_check.add_argument("--digest", required=True)
+    copy_move = copy_commands.add_parser("move", help="Record that the folder of a copy was moved.")
+    copy_move.add_argument("copy_id", help="COPY-NNN")
+    copy_move.add_argument("--path", required=True)
+    copy_close = copy_commands.add_parser("close", help="ERASED once the folder is gone; KEPT, by decision, while it stays.")
+    copy_close.add_argument("copy_id", help="COPY-NNN")
+    copy_close.add_argument("--state", required=True, choices=("ERASED", "KEPT"))
+    copy_close.add_argument("--decision", help="HD-NNN or TPL-D-NNN keeping the copy (KEPT only).")
+    copy_cleanup = copy_commands.add_parser(
+        "cleanup", help="Write the script the Project Owner runs to erase the returned copies; erases nothing.")
+    copy_cleanup.add_argument("--output", required=True, help="Script path, outside the repository.")
     args = parser.parse_args(argv)
     control = ProjectControl(ROOT)
     if command_mutates(args):
@@ -6854,6 +8539,45 @@ def command_main(argv: Sequence[str] | None = None) -> int:
             return lifecycle_report("idea", "FAIL", control.repository_context(), getattr(args, "idea_id", "ID-NEW").upper(), str(exc), label="IDEA_ID")
         committed = "committed on the canonical branch" if control.operating_mode() == "NORMAL_MODE" else "written (Bootstrap Mode: commit it with the initialization)"
         return lifecycle_report("idea", "PASS", control.repository_context(), idea_id, f"idea recorded in ideas-state.v1.json and IDEAS.md, {committed}", label="IDEA_ID")
+    if args.command == "copy":
+        subcommand = f"copy {args.copy_command}"
+        identifier = str(getattr(args, "copy_id", "") or "COPY-NEW").upper()
+        try:
+            if args.copy_command == "open":
+                entry, slip, slip_path = control.open_copy(args)
+                outcome = lifecycle_report(
+                    subcommand, "PASS", control.repository_context(), entry["copy_id"],
+                    f"{entry['path']} registered OPEN ({entry['kind']}, {entry['usage']}, fate {entry['fate']}, "
+                    f"due {entry['due']}, closes with {entry['closes_with']}); place the exit slip at {slip_path} "
+                    "when making the copy", label="COPY_ID")
+                print(f"COPY_SLIP_PATH: {slip_path}")
+                print("COPY_SLIP: " + json.dumps(slip, ensure_ascii=False, sort_keys=True))
+                return outcome
+            if args.copy_command == "return":
+                returned = control.return_copies(Path(args.proofs))
+                return lifecycle_report(subcommand, "PASS", control.repository_context(), ", ".join(returned),
+                                        "every item back in the original or abandoned by name; register updated",
+                                        label="COPY_ID")
+            if args.copy_command == "check":
+                return report(subcommand, control.check_copy(identifier, args.path, args.digest), context)
+            if args.copy_command == "move":
+                entry = control.move_copy(identifier, args.path)
+                return lifecycle_report(subcommand, "PASS", control.repository_context(), identifier,
+                                        f"now registered at {entry['path']}; scripts written for its old place no longer pass copy check",
+                                        label="COPY_ID")
+            if args.copy_command == "close":
+                entry = control.close_copy(identifier, args.state, args.decision)
+                return lifecycle_report(subcommand, "PASS", control.repository_context(), identifier,
+                                        f"{entry['state']}" + (f" by {entry['closing_decision']}" if entry["state"] == "KEPT" else ""),
+                                        label="COPY_ID")
+            written = control.copies_cleanup_script(Path(args.output))
+            cleanup_findings: list[Finding] = []
+            add(cleanup_findings, "COPY_CLEANUP_SCRIPT", True,
+                f"{args.output} written for {len(written)} returned cop{'y' if len(written) == 1 else 'ies'}"
+                + (f" ({', '.join(written)})" if written else "") + "; nothing erased — the Project Owner runs it")
+            return report(subcommand, cleanup_findings, context)
+        except (ProjectControlError, OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
+            return lifecycle_report(subcommand, "FAIL", control.repository_context(), identifier, str(exc), label="COPY_ID")
     if args.command == "decision":
         if args.decision_command == "show":
             try:
@@ -6936,6 +8660,13 @@ def command_main(argv: Sequence[str] | None = None) -> int:
             def line(key: str, **values: Any) -> None:
                 print(speak(tongue, key, **values))
 
+            slip = payload.get("copy_slip")
+            if slip:
+                if slip.get("moved"):
+                    line("status.copy_moved", original=slip["original"], path=slip["path"])
+                else:
+                    line("status.copy_slip", original=slip["original"], ticket=slip["ticket"], due=slip["due"],
+                         issued=slip["issued_at"])
             line("status.project", name=payload.get("project_name", "UNKNOWN"), mode=payload.get("mode", "INVALID"))
             style = payload.get("reporting_style", "UNKNOWN")
             line("status.reporting", label=reporting_style_label(style, tongue))
@@ -6972,6 +8703,9 @@ def command_main(argv: Sequence[str] | None = None) -> int:
                     frozen, share = bindable
                     line("status.bindable", living=len(control.living_decision_refs()),
                          frozen=frozen, share=share)
+            counts = payload.get("copies")
+            if counts and counts.get("total"):
+                line("status.copies", summary=speak(tongue, "copies.summary", **counts))
             for item in items:
                 if item["status"] in {"DONE", "REJECTED", "SUPERSEDED"}:
                     continue

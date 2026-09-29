@@ -318,6 +318,67 @@ décision de ce dépôt nomme le dossier et cite les deux confirmations — c’
 vérifiée par son propre contrôleur, que l’entrée a été confirmée deux fois. Une décision
 qui n’autorise qu’un travail interne, sans sortie de périmètre, porte `NOT_APPLICABLE`.
 
+## Copies du dépôt — le tableau des clés
+
+Une copie faite pour protéger l’original (chantier, revue, répétition) a une naissance **et
+une fin**. L’original tient le registre de ses copies ; chacune y a un **ticket** — la
+décision que le double arrêt a produite, dont l’unique ligne `Folder scope:` nomme le dossier
+de la copie ou un dossier qui le contient —, un sort décidé au départ (`RETURN_THEN_ERASE`,
+`ERASE`, `KEEP`), une date de retour, et ce avec quoi elle se ferme : un Work Item ou une
+version. Dans le template, le ticket est une décision `TPL-D-NNN` qui porte, sur ses propres
+lignes, `Folder scope:`, `Confirmation 1:` et `Confirmation 2:`.
+
+1. **Le ticket avant la voiture.** `copy open` enregistre la copie avant qu’elle existe, depuis
+   la canonique (`main` pour le template), et imprime sa **fiche de sortie**. Le geste de copie
+   la dépose dans `.git/copie.json` (clone) ou dans `copie.json` à la racine du contenant
+   (export d’une révision, laissée intacte dans `source/`). Une copie n’est jamais l’original,
+   ni dedans, ni autour ; elle ne chevauche aucune autre copie ; son nom suit la règle
+   `<dépôt>-<usage>-<référence>[-rang]`.
+2. **Une copie n’est jamais un second original** : ni version, ni tag, ni lien vers un remote.
+   Elle protège par séparation, pas par interdiction : les droits de l’agent restent ceux de
+   son mandat. Dans une copie, `status` commence par sa fiche de sortie ; les commandes `copy`
+   n’y tournent pas — elle porte une page périmée du registre — et son audit ne juge pas les
+   copies ; un clone sans fiche, qui hérite du registre, n’y écrit rien non plus. Elles tournent
+   dans l’original, qui reste là où ses copies ont été enregistrées.
+3. **Rendre se prouve.** `copy return` lit **tout** ce que la copie contient — le dossier
+   parcouru fichier par fichier et comparé octet par octet à ce que `HEAD` enregistre (aucun
+   drapeau d’index, cache de dates ni dossier de travail déclaré ailleurs ne cache rien),
+   dossiers ignorés compris, index, références, stash, commits que seul un reflog atteint (des
+   deux côtés de ses entrées), et ce que `.git` garde du propriétaire, par liste fermée ; pour
+   un export, la révision exportée elle-même — sans lancer aucune commande que la copie
+   configure (un clone partiel est refusé avant toute lecture). Chaque élément doit être dans
+   l’original — un commit sur **une branche ou un tag** (une référence de suivi, un reflog, une
+   tête détachée ne gardent rien longtemps), un fichier **committé** avec les mêmes octets — ou
+   abandonné par son nom, avec sa raison. Une revue revient avec son mandat. Ce que le
+   contrôleur ne sait pas classer bloque, jamais compté comme vide : opération en cours,
+   conflit, dépôt imbriqué, point de montage, fichier spécial (jamais ouvert), autre copie
+   enregistrée à l’intérieur, où qu’elle se cache, `.git` compris. Le retour enregistre l’empreinte du contenu,
+   sans ambiguïté possible, et le commit de l’original où ses fichiers sont prouvés ; une copie
+   retravaillée se rend de nouveau.
+4. **Rendre les clés avant de fermer.** `close WI-NNN` refuse tant qu’une copie du Work Item est
+   ouverte ; pour une version, l’ordre est rapatrier, intégrer, `copy return`, **puis** le tag,
+   puis la vue. `COPIES_RETURNED` échoue quand une copie reste ouverte après que sa cible s’est
+   fermée : le garde-fou refusant tout commit dont l’audit échoue, la réparation est **une**
+   transaction qui couvre toutes les copies en faute, rendues ou gardées par décision. Le
+   retard n’est qu’un avertissement de `status`.
+5. **Jamais d’effacement sur une preuve ancienne.** Le contrôleur n’efface rien. `copy cleanup`
+   écrit le script que le Project Owner lance, depuis l’original et sans table de
+   correspondance : pour chaque copie, `copy check` avec le chemin et l’empreinte de ce qu’il va
+   effacer, juste avant de l’effacer. Le contrôle juge le contenu, puis ce que l’original garde
+   **encore** (une branche supprimée ou un historique réécrit depuis le retour, et rien n’est
+   effacé), puis la place en dernier ; un déplacement (`copy move`), un nouveau retour, une
+   garde, un contenu changé ou un autre dossier à la même place le font refuser. `copy close`
+   dit `ERASED` quand le dossier n’existe plus, `KEPT` par décision.
+
+Limites assumées : une copie jamais déclarée reste invisible ; le registre ne voit pas ce qui a
+été envoyé depuis une copie, seulement ce qui n’est pas revenu ; quelques instants séparent le
+contrôle de l’effacement, pendant lesquels personne n’écrit dans la copie ; le rôle d’un fichier
+rendu (mandat, livrable…) est déclaré, pas vérifié — le contrôleur prouve des octets, pas un
+sens ; un contenu transformé à l’extraction (Git LFS, fins de ligne, filtres) apparaît comme un
+élément à rendre ou abandonner ; un simple fichier glissé dans les dossiers que Git tient pour
+lui (`objects`, `refs`, `logs`) n’est pas inventorié. Commandes et fichier de preuves :
+[Project Control](project_control/README.md#copies-du-dépôt--le-tableau-des-clés).
+
 ## Retours au Project Owner
 
 Le Project Owner choisit, à l’initialisation, la forme des retours qui lui sont faits :

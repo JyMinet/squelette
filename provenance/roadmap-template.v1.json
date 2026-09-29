@@ -1,7 +1,7 @@
 {
   "$schema": "../project_control/schemas/template-roadmap.v1.schema.json",
   "schema_version": "1.0.0",
-  "updated_at": "2026-09-27",
+  "updated_at": "2026-09-29",
   "template": {
     "name": "Squelette",
     "repository": "Squelette V3 -runtime-proof (GitHub privé JyMinet/squelette-atelier, NAS NAS) — miroir public JyMinet/squelette",
@@ -325,6 +325,25 @@
         "TPL-D-078",
         "TPL-D-079"
       ]
+    },
+    {
+      "version": "3.21.0",
+      "date": "2026-09-29",
+      "label": "le tableau des clés : chaque copie a un ticket, un sort et une fin prouvée",
+      "decisions": [
+        "TPL-D-080",
+        "TPL-D-081",
+        "TPL-D-082"
+      ]
+    },
+    {
+      "version": "3.21.1",
+      "date": "2026-09-29",
+      "label": "les essais des clés tournent aussi depuis un projet dérivé",
+      "decisions": [
+        "TPL-D-083",
+        "TPL-D-084"
+      ]
     }
   ],
   "next_version": null,
@@ -598,13 +617,31 @@
         "TPL-D-073"
       ],
       "scope": "provenance/maintenance/scopes/p19-scope-deux-volumes.md"
+    },
+    {
+      "id": "P21",
+      "title": "Le tableau des clés : les copies du dépôt ont une fin",
+      "state": "IN_PROGRESS",
+      "summary": "Les copies faites pour protéger l'original — chantiers, revues, répétitions — naissaient bien et ne finissaient jamais : une douzaine de dossiers en trois semaines, six noms pour trois usages, deux ménages à la main, un mandat sauvé de justesse. L'original tient désormais le registre de ses copies : chacune a un ticket (la décision que le double arrêt produit déjà), un sort décidé au départ, une date de retour, et une fiche de sortie posée dans la copie. Rendre se prouve : tout ce que la copie contient — fichiers, dossiers ignorés, stash, commits qu'un reflog atteint encore, ce que .git garde du propriétaire — est revenu dans l'original ou abandonné par son nom. On ne ferme pas un chantier et on ne pose pas l'étiquette d'une version avec des clés dehors. Le contrôleur n'efface rien : il écrit le script que le Project Owner lance, et ce script vérifie chaque dossier juste avant de l'effacer. Cadré en trois fiches relues par une seconde IA (sept constats, puis trois partiels, tous fermés) ; construit en 3.21.0 dans un dossier de chantier qui suit déjà la règle. Une revue indépendante du code y a ouvert dix trous — dont des fichiers modifiés que Git ne voyait plus et qui seraient partis à l'effacement, et un script qui pouvait effacer un autre dossier que celui qu'il avait contrôlé — ; tous sont fermés, chacun par un essai. La seconde IA a ensuite relu le code : six constats, dont trois pertes de travail démontrées sur des copies fictives ; tous confirmés, fermés, chacun par un essai. Sa relecture courte les a trouvés fermés, avec un défaut nouveau introduit par une correction — un tube nommé comme une fiche de sortie bloquait le contrôle — ; fermé, puis contrôlé : fermé, avec un autre défaut né de cette correction — une fiche agrandie au-delà de 64 Kio cachait la copie qu'elle désigne — ; fermé, contrôlé : fermé, avec un faux refus mineur né de cette correction — un original nommé « source » pris pour une copie à cause d'une simple liste voisine — ; fermé à son tour. Livré dans l'atelier et promu en 3.21.0 le 29 septembre ; la répétition de la montée d'un projet réel a trouvé quatre essais qui supposaient le journal et la licence du template, corrigés en 3.21.1, promue le même jour. Reste : rendre et effacer le dossier de relecture et le dossier de chantier, les deux premières copies à finir.",
+      "versions": [
+        "3.21.0",
+        "3.21.1"
+      ],
+      "decisions": [
+        "TPL-D-080",
+        "TPL-D-081",
+        "TPL-D-082",
+        "TPL-D-083",
+        "TPL-D-084"
+      ],
+      "scope": "provenance/maintenance/scopes/p21-scope-tableau-des-cles.md"
     }
   ],
   "now": [
     {
-      "text": "Le squelette est en 3.20.2, promue le 27 septembre au soir : deux correctifs de la suite d'essais pour les projets dérivés (3.20.1 : la copie d'essai repart de registres vierges ; 3.20.2 : la fausse « nouvelle version » des essais de montée aussi). Alpha est en 3.20.0 depuis le 20 septembre (HD-088 / WI-074), volume 1 relié le même jour (HD-089) ; sa montée, répétée sur copie jetable, ira directement en 3.20.2 sous son propre double arrêt. Non vérifié par ce tableau : il ne regarde que le squelette.",
+      "text": "Le squelette est en 3.21.1, promue le 29 septembre : le tableau des clés — chaque copie du dépôt a un ticket, un sort et une fin prouvée (3.21.0) —, et ses essais qui tournent aussi depuis un projet dérivé (3.21.1). Alpha est en 3.20.2 ; sa montée directe vers la 3.21.1 est autorisée. Non vérifié par ce tableau : il ne regarde que le squelette.",
       "tone": "good",
-      "source": "journal du squelette (TPL-D-076 à TPL-D-079) ; brief du Project Owner du 27 septembre (décisions HD-088, HD-089 et chantier WI-081 d'Alpha)"
+      "source": "journal du squelette (TPL-D-076 à TPL-D-084) ; brief du Project Owner du 27 septembre (HD-097, WI-082 d'Alpha)"
     },
     {
       "text": "Cinq passes de contrôle indépendant depuis le 10 septembre : vingt et un défauts démontrés, tous corrigés avec leur essai. La cinquième a trouvé que le rangement des copies jetables de la 3.18.2 pouvait effacer le worktree d'un autre, et qu'un nom accentué échappait à la règle de contenu des fusions — fermés en 3.19.1. La revue de cadrage de « la question de l'existant » a ensuite fait apparaître un défaut de reprise, corrigé en 3.19.2. Le squelette est public depuis le 11 septembre : JyMinet/squelette, miroir anonymisé du dépôt privé, rafraîchi en 3.19.2.",
@@ -612,16 +649,21 @@
       "source": "rapports sous provenance/maintenance/ ; journal du squelette (TPL-D-059, TPL-D-065)"
     },
     {
-      "text": "183 essais, chacun né d'un défaut démontré ou d'un usage réel. Deux projets réels vivent sur le squelette en plus du template : Alpha, adopté avec son histoire figée, et « Coût moyen crypto », né gouverné.",
+      "text": "220 essais, chacun né d'un défaut démontré ou d'un usage réel. Deux projets réels vivent sur le squelette en plus du template : Alpha, adopté avec son histoire figée, et « Coût moyen crypto », né gouverné.",
       "tone": "good",
       "source": "journal du squelette ; note de test du 9 sept."
     }
   ],
   "waiting_for_owner": [
     {
-      "title": "Envoyer la 3.20.2, rafraîchir le miroir public, monter Alpha",
-      "detail": "la 3.20.2 est promue et taguée (main un commit devant le tag). Restent tes gestes : l'envoi de main et du tag vers origin et vers le NAS, la release GitHub ; puis, chacun sous son double arrêt, le rafraîchissement du miroir public JyMinet/squelette (la 3.20.1 y est déjà posée, en attente de ton envoi) et la montée d'Alpha directement de 3.20.0 à 3.20.2 (répétition déjà verte).",
-      "source": "journal du squelette (TPL-D-078, TPL-D-079)"
+      "title": "Envoyer la 3.21.1, puis la vitrine et Alpha",
+      "detail": "la 3.21.1 est promue et taguée (main un commit devant le tag) ; elle emporte la 3.21.0, promue le matin même. Restent tes gestes : l'envoi de main et des deux étiquettes vers origin et vers le NAS, la release GitHub. Le rafraîchissement du miroir public et la montée d'Alpha, directement en 3.21.1, sont autorisés chacun par sa phrase ; leurs envois seront aussi tes gestes.",
+      "source": "journal du squelette (TPL-D-082 à TPL-D-084)"
+    },
+    {
+      "title": "Rendre les clés : le dossier de relecture et le dossier de chantier",
+      "detail": "les deux copies faites pour construire le tableau des clés sont les premières qu'il fera finir. Leurs papiers sont déjà rangés dans le dépôt ; il reste à prouver que tout ce qu'elles contiennent est revenu dans l'atelier ou abandonné par son nom, puis à les effacer par ton script, qui vérifie chaque dossier juste avant.",
+      "source": "TPL-D-080, TPL-D-082 ; fiche P21"
     },
     {
       "title": "Le miroir public est en ligne : About et Topics",
@@ -949,7 +991,16 @@
       "source": "discussion squelette, 14 sept.",
       "state": "IN_PROGRESS",
       "target": "P19",
-      "note": "Trois lots : les deux volumes (livré en 3.20.0), le paquet de chantier, le ménage à la clôture. Les deux derniers restent à cadrer."
+      "note": "Trois lots : les deux volumes (livré en 3.20.0), le paquet de chantier (P20, cadré à part), le ménage à la clôture (P21, le tableau des clés, construit en 3.21.0 — promotion en attente)."
+    },
+    {
+      "idea_id": "ID-024",
+      "stated_at": "2026-09-28",
+      "quote": "On doit faire en sorte que cela n'arrive pas ! Dans le cadre d un développement, Quand un dossier doit etre copier pour protéger l original, Si le developpement est validé, ce dossier doit etre cloturé et effacé.",
+      "source": "discussion squelette, 28 sept.",
+      "state": "IN_PROGRESS",
+      "target": "P21",
+      "note": "Le tableau des clés : ticket, sort, fiche de sortie, retour prouvé, script d'effacement vérifié — construit en 3.21.0, promu le 29 sept. ; restent les deux premières copies à rendre."
     }
   ],
   "past": [

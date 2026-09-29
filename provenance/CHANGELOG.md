@@ -13,6 +13,10 @@ examples/hello-squelette/demo.py --write`) avant de committer : le test de la su
 la rejoue et refuse tout écart entre le README et la sortie réelle.
 Aucune entrée n'implique une promotion de la branche canonique : la promotion est
 une décision humaine enregistrée séparément. Append-only.
+Depuis la 3.21.0, une décision qui ouvre une copie du template porte, sur ses propres
+lignes indentées sous sa puce, `Folder scope:` (le dossier de la copie ou un dossier qui
+le contient), `Confirmation 1:` et `Confirmation 2:` : `copy open` ne reconnaît qu'elles.
+Les décisions antérieures ne sont pas réécrites.
 
 ## Décisions du Project Owner — 2026-09-06
 
@@ -906,6 +910,101 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   pas de cette phrase : l'envoi et la release restent les gestes du Project Owner (`TPL-D-004`), le
   miroir et la montée ont chacun leur double arrêt propre.
 
+## Décisions du Project Owner — 2026-09-28
+
+- `TPL-D-080` — **Le tableau des clés : chaque copie du dépôt a une fin ; construit en `3.21.0`.**
+  Constat du Project Owner (2026-09-28, squelette en `3.20.2`) : les dossiers copiés pour protéger
+  l'original se multiplient sous des noms différents, ne sont jamais effacés, et des travaux y
+  dévient — « On doit faire en sorte que cela n'arrive pas ! […] Si le developpement est validé, ce
+  dossier doit etre cloturé et effacé. » Cadré en trois fiches, chacune relue par une seconde IA puis
+  contre-vérifiée : la V1 (sept constats, `CADRAGE_TABLEAU_DES_CLES_V1_REQUIRES_MAJOR_REDLINE`, dont un
+  effacement possible de l'original par un dossier déclaré autour de lui), la V2 (quatre constats
+  fermés, trois partiels, `CADRAGE_TABLEAU_DES_CLES_V2_REQUIRES_MAJOR_REDLINE`), la V3, qui ferme les
+  trois partiels et un quatrième défaut trouvé à la contre-vérification — une réparation copie par
+  copie aurait été refusée par le garde-fou de commit. Décisions : « d'accord avec les propositions »
+  (18:05) — retard en simple avertissement ; futures décisions `TPL-D` à lignes structurées, les
+  anciennes intouchées ; copies conservées sous décision ; inventaire du disque plus tard ; copies
+  déjà présentes au cas par cas ; commandes `copy open`, `copy return`, `copy check`, `copy close`,
+  `copy cleanup` (qui prépare un script et n'efface rien) et `copy move` ; papiers rendus dans le
+  dépôt, un tiroir d'archives hors dépôt n'étant pas une preuve de retour. Puis « Construire »
+  (18:27) plutôt qu'une troisième relecture : les trois cas partiels deviennent des essais
+  obligatoires, et la seconde IA relira le code. La mesure de la phase 0 a remplacé l'identité d'un
+  dossier par ses numéros système — instables à travers le montage du poste — par un jeton porté par
+  la fiche de sortie. Cette décision applique la règle qu'elle introduit :
+  Folder scope: ~/Projets/squelette-chantier-p21
+  Confirmation 1: « Je suis ok » (2026-09-28, 18:32, en réponse au STOP 1 : dossier de chantier, copie de l'atelier, mesure puis construction ; alternative : copie jetable de session)
+  Confirmation 2: « Confirmé : dossier de chantier ~/Projets/squelette-chantier-p21, copie de l'atelier sans liens GitHub ni NAS, atelier et Alpha lus seulement, aucun envoi, aucun effacement. » (18:33, en réponse au périmètre reformulé)
+
+  La livraison dans l'atelier passe par son propre double arrêt ; la promotion reste une décision
+  séparée ; le numéro de version se confirme à la livraison.
+
+## Décisions du Project Owner — 2026-09-29
+
+- `TPL-D-081` — **Livraison de la `3.21.0` dans l'atelier.** Après la relecture du code par la seconde
+  IA, sa relecture courte et deux contrôles (`CODE_P21_REQUIRES_MAJOR_REDLINE`,
+  `CODE_P21_V2_REQUIRES_MAJOR_REDLINE`, `CODE_P21_N01_REQUIRES_MAJOR_REDLINE`,
+  `CODE_P21_N02_REQUIRES_MINOR_REDLINE`), chacun contre-vérifié par rejeu et corrigé avec son essai, le
+  Project Owner a choisi de livrer sans le dernier contrôle court de la correction de `N03`, qui lui
+  restait proposé : « Livrer » (2026-09-29, 08:56). Double arrêt : `STOP 1` (dossier cible, action —
+  la branche déposée à côté de la version en service, sans étiquette, sans envoi, sans effacement —,
+  contenu de la branche, numéro à confirmer, deux pages ajoutées ensuite, manière de faire, alternative :
+  ne pas livrer et garder le contrôle court possible) → « Oui » (09:21) ; `STOP 2` (périmètre exact
+  reformulé : deux pages dans le dossier de chantier, une seule opération dans l'atelier, vérification
+  sur une copie de lecture ; les fichiers temporaires de Git, s'il en reste, effacés seulement sur une
+  permission à part) → « Confirmé : branche claude/p21-tableau-des-cles dans
+  ~/Projets/squelette-atelier, version 3.21.0, main intouché, pas de tag, pas d'envoi. »
+  (09:25). Le numéro `3.21.0`, que `TPL-D-080` laissait à confirmer, est confirmé. La branche est
+  récupérée dans l'atelier depuis le dossier de chantier, sous son nom et sans checkout : `main`, les
+  tags et les remotes n'y changent pas ; rien n'est envoyé ni effacé. La promotion reste une décision
+  séparée ; le dossier de relecture et le dossier de chantier rendront ensuite leurs clés.
+
+- `TPL-D-082` — **Promotion de la `3.21.0`.** « Promouvoir » (2026-09-29, 10:05), après la livraison
+  de la branche dans l'atelier sous double arrêt (`TPL-D-081` : « Oui », 09:21, puis la phrase qui
+  nomme le dossier, 09:25), vérifiée sur l'arbre livré depuis une copie de lecture de l'atelier :
+  220 essais verts, audit, bootstrap-audit, traçabilité et démo PASS ; mêmes 220 essais verts dans la
+  copie de travail de la session ; export public accepté (165 fichiers, aucun mot interdit, aucun
+  registre). `claude/p21-tableau-des-cles` est promue branche canonique par fast-forward de `main` ;
+  la baseline promue reçoit le tag `v3.21.0`, posé sur le commit qui enregistre cette décision ; la
+  vue est régénérée ensuite et committée à part, si bien que `main` est un commit devant le tag. Le
+  registre des copies du template est vide : les deux copies faites pour ce chantier — le dossier de
+  relecture et le dossier de chantier — sont antérieures à l'outil et n'y sont pas inscrites ; leurs
+  papiers sont déjà rangés dans le dépôt, et elles rendront leurs clés ensuite, au cas par cas
+  (décision du 28 septembre), les premières que le tableau des clés fera finir. L'envoi vers
+  `origin` et vers le NAS et la release GitHub restent les gestes du Project Owner (`TPL-D-004`) ; le
+  rafraîchissement du miroir public et la montée d'Alpha ont chacun leur double arrêt.
+
+- `TPL-D-083` — **Les essais des clés tournent aussi depuis un projet dérivé ; correctif en `3.21.1`.**
+  En répétant sur une copie jetable la montée d'Alpha de la `3.20.2` à la `3.21.0`, la
+  suite du template lancée depuis cette copie a rendu **220 essais : 206 réussis, 10 ignorés (propres
+  au template) et 4 rouges**. Trois essais du tableau des clés écrivaient leur ticket dans le journal du
+  template, `provenance/CHANGELOG.md`, que leur copie d'essai n'avait pas : un projet dérivé ne porte pas
+  ce journal, qui n'est pas un fichier du core. Le quatrième cachait sa modification dans `LICENSE`,
+  que le projet n'a pas davantage. Aucun ne testait encore ce pour quoi il était écrit ; le contrôleur
+  n'est pas en cause. Décision : « Oui À B C » (2026-09-29, 11:11, en réponse au `STOP 1` — A : livrer
+  et promouvoir la correction dans l'atelier ; B : rafraîchir la vitrine directement en `3.21.1` ; C :
+  monter Alpha directement de la `3.20.2` à la `3.21.1` ; pour chacun, l'alternative dans
+  le périmètre), puis, en réponse au périmètre exact reformulé (`STOP 2`, 11:43) : « Confirmé :
+  correctif 3.21.1 dans ~/Projets/squelette-atelier, livré et promu avec l'étiquette
+  v3.21.1, pas d'envoi. » — la vitrine et Alpha ont reçu, dans le même message, chacune sa
+  propre phrase, qui nomme son dossier. Correction dans les essais seuls : une copie d'essai qui a
+  besoin d'un journal du template en commence un quand le projet n'en a pas, et l'essai de
+  l'inventaire cache sa modification dans `FIRST_START.md`, un fichier du core que tout projet porte ;
+  aucune ligne du contrôleur ne change. Un essai nouveau (B17) rejoue les quatre depuis un projet dérivé
+  privé de ces deux fichiers : rouge sur la `3.21.0` — les mêmes quatre défaillances —, vert après. La
+  même double confirmation couvre la promotion et l'étiquette (`TPL-D-084`).
+
+- `TPL-D-084` — **Promotion de la `3.21.1`.** Couverte par la double confirmation de `TPL-D-083`
+  (« livré et promu avec l'étiquette v3.21.1 », 11:43), après la livraison de la branche dans
+  l'atelier, vérifiée sur l'arbre livré depuis une copie de lecture de l'atelier : 221 essais verts,
+  audit, bootstrap-audit, traçabilité et démo PASS ; mêmes essais dans la copie de travail de la
+  session ; export public accepté. `claude/v3.21.1-essais-des-projets-derives` est promue branche
+  canonique par fast-forward de `main` ; la baseline promue reçoit le tag `v3.21.1`, posé sur le
+  commit qui enregistre cette décision ; la vue est régénérée ensuite et committée à part, si bien
+  que `main` est un commit devant le tag. La `3.21.0` reste une étape de l'histoire : la vitrine et
+  Alpha vont directement à la `3.21.1`, chacune sous sa propre phrase de confirmation.
+  L'envoi vers `origin` et vers le NAS et la release GitHub restent les gestes du Project Owner
+  (`TPL-D-004`).
+
 ## Décisions du Project Owner — 2026-09-10 (suite 10)
 
 - `TPL-D-051` — **Deux des trois constats de la troisième passe de contrôle (3.17.0).** La troisième
@@ -918,6 +1017,192 @@ reste vierge dans le template : il appartient aux projets dérivés, pas au temp
   d'abord** `F-08`, la baseline défigeable, qui demande d'ancrer une déclaration à la décision qui
   la nomme, donc de toucher au format des décisions, alors qu'Alpha en a deux
   déclarées. La promotion reste une décision séparée.
+
+## 2026-09-29 — `claude/v3.21.1-essais-des-projets-derives` — les essais des clés tournent aussi depuis un projet dérivé
+
+- Mandat : `TPL-D-083`. Double arrêt : `STOP 1` (trois dossiers, trois gestes séparés : l'atelier, la
+  vitrine, Alpha ; pour chacun l'action et l'alternative) → « Oui À B C » (11:11) ;
+  `STOP 2` (périmètre exact de chacun reformulé) → pour l'atelier « Confirmé : correctif 3.21.1 dans
+  ~/Projets/squelette-atelier, livré et promu avec l'étiquette v3.21.1, pas d'envoi. »
+  (11:43).
+- Baseline : `main` à `f12c8f1` (`v3.21.0` = `3a7c561`, plus la vue régénérée).
+- Trouvé par : la répétition, sur copie jetable, de la montée d'Alpha vers la `3.21.0` —
+  220 essais depuis le projet, 206 réussis, 10 ignorés, 4 rouges (un échec, trois erreurs). Une
+  première exécution en quatre lots parallèles avait d'abord manqué de place sur le disque de la
+  session — chaque essai copie le projet entier — ; rejouée à la suite, elle a laissé ces quatre-là.
+- **Le constat.** Trois essais (`…the_tag_goes_on_returned_keys…`, `…the_register_is_committed_on_the_reference_branch_only`,
+  `…a_repair_never_hides_another_failure`) enregistrent un ticket `TPL-D` dans le journal du template ;
+  la copie d'essai d'un projet dérivé n'en a pas (`FileNotFoundError: provenance/CHANGELOG.md`). Le
+  quatrième (`…the_inventory_walks_the_folder…`) marque `LICENSE` pour que Git ne le voie plus ; le
+  projet n'a pas de licence (`git update-index` : 128).
+- **La correction, dans les essais seuls** : `record_template_copy_decision` commence un journal quand
+  la copie n'en a pas ; l'essai de l'inventaire cache sa modification dans `FIRST_START.md`, fichier du
+  core. `README.md`, que l'essai garde, est un fichier obligatoire de tout projet gouverné.
+- **L'essai qui manquait** : `test_the_tests_of_the_keys_run_from_a_derived_project` (B17) — un projet
+  dérivé (`repository_role` `PROJECT`) privé du journal et de la licence rejoue les quatre essais :
+  rouge sur la `3.21.0` (1 échec, 3 erreurs, les mêmes), vert après.
+- 221 essais OK sur le template (VM Linux du poste, Python 3.10.12 ; copie de travail de la session,
+  Python 3.11) ; `audit`, `bootstrap-audit`, démo PASS ; export public accepté (165 fichiers, aucun
+  mot interdit). Copie jetable d'Alpha montée avec ce core : **221 essais, 211 réussis,
+  10 ignorés, 0 échec**.
+- Manifeste régénéré (`skeleton_version` `3.21.1`, 25 fichiers core), démo et transcript régénérés,
+  feuille de route mise à jour.
+- Commits passés sous `PROJECT_CONTROL_HOOK_OVERRIDE="TPL-D-083"`, la promotion sous `TPL-D-084`.
+- Non fait : envoi, release (gestes du Project Owner). La vitrine et la montée d'Alpha
+  suivent, chacune sous sa propre phrase de confirmation.
+
+## 2026-09-28 — `claude/p21-tableau-des-cles` — chaque copie a un ticket, un sort et une fin prouvée
+
+- Mandat : `TPL-D-080` (double arrêt cité sur ses lignes structurées : dossier de chantier
+  `~/Projets/squelette-chantier-p21`, copie de l'atelier sans remote, atelier et
+  Alpha lus seulement, aucun envoi, aucun effacement).
+- Baseline : `main` à `b9fe0e7` (`v3.20.2` = `9b8792e`, plus la vue régénérée).
+- Lieu : le dossier de chantier est un clone débranché de l'atelier, avec son garde-fou et une fiche
+  de sortie posée à la main (antérieure à l'outil, jamais importée) ; la construction s'est faite
+  dans une copie de session, et la branche est transférée dans le dossier de chantier. L'atelier n'a
+  été que lu.
+- Mesure (phase 0) : `provenance/maintenance/2026-09-28-rapport-mesure-phase-0-p21.md`, verdict
+  `P21_MEASURE_PASS_BUILD_MAY_START`. Le tiroir `.git` réel d'un clone et d'Alpha se
+  classe entièrement par liste fermée ; l'inventaire complet du plus gros dépôt gouverné (5 696
+  fichiers ignorés, 770 Mo) prend moins de dix secondes ; aucune autre copie du squelette hors des
+  archives. Ajustement A-01 : les numéros de dossier vus à travers le montage (FUSE) ne sont pas
+  ceux du poste ; l'identité d'une copie est son jeton de fiche de sortie.
+- **Construit** : le registre (`project_control/copies-state.v1.json`, `provenance/copies-state.v1.json`
+  pour le template ; absent = vide ; schéma `copies-state.v1`) ; `copy open` (frontière dans les deux
+  sens, sur chemins résolus ; nom `<dépôt>-<usage>-<référence>[-rang]` ; ticket valide dont le `Folder
+  scope` couvre le dossier ; cible encore ouverte ; fiche de sortie à jeton) ; `copy return` (inventaire
+  complet — arbre, dossiers ignorés fichier par fichier, index, références, stash, commits qu'un seul
+  reflog atteint, `.git` par liste fermée, et pour un export tout écart de `source/` à la révision
+  exportée —, couverture automatique de ce que l'original atteint, preuves de fichiers committés à
+  l'octet, abandons nommés, mandat exigé d'une revue, empreinte du contenu, transaction groupée) ;
+  `copy check` (lecture seule, liée au chemin, à la fiche et à l'empreinte) ; `copy cleanup` (script
+  hors du dépôt qui vérifie chaque dossier juste avant de l'effacer) ; `copy move` ; `copy close`
+  (`ERASED` quand le dossier n'existe plus, un volume absent n'étant pas un effacement ; `KEPT` par
+  décision). Audits `COPIES_REGISTER` et `COPIES_RETURNED` ; `close WI-NNN` refuse avec une copie
+  ouverte ; le garde-fou refuse le registre du template ailleurs que sur `main` ; `status` affiche la
+  fiche de sortie d'une copie et la ligne « Copies » ; la vue ajoute le registre à ses sources et une
+  ligne à son bandeau ; `PROJECT_CONTROL_PATH_MAP` relie les chemins du propriétaire à ceux d'une
+  session montée. La copie d'essai et l'export public partent sans registre.
+- Écarts assumés à la fiche V3, écrits ici pour la relecture du code : l'identité par jeton (A-01) ;
+  les preuves passent par un fichier JSON (un seul chemin de code, pour une copie ou un groupe) ;
+  `copy move` n'exige pas un contenu inchangé — un déplacement n'autorise rien, et `copy check`
+  compare le contenu avant tout effacement ; pas de message « ce dossier n'a pas de ticket » — un
+  original n'en a pas, et une copie sans fiche en est indiscernable ; une décision de garde
+  enregistrée pendant une faute se committe sous `PROJECT_CONTROL_HOOK_OVERRIDE`, le garde-fou
+  refusant tout commit dont l'audit échoue.
+- **Revue indépendante du code**, avant la relecture de la seconde IA : un agent séparé, qui n'avait
+  pas vu la construction, a attaqué la 3.21.0 de bout en bout sur des copies d'essai et ouvert dix
+  trous. Tous sont fermés ici, chacun par un essai vérifié rouge sur le code d'avant et vert après :
+  1. des fichiers modifiés que Git ne voit plus (drapeaux d'index `assume-unchanged` et
+     `skip-worktree`, cache de dates réglé pour s'y fier) échappaient à l'inventaire et partaient à
+     l'effacement — l'inventaire parcourt désormais le dossier et compare chaque fichier, octet par
+     octet, à ce que `HEAD` enregistre ;
+  2. un dépôt imbriqué committé comme lien (gitlink) n'était pas inventorié — refusé, comme un
+     conflit non résolu ;
+  3. un commit couvert par une référence de suivi ou par un reflog pouvait quitter l'original avant
+     l'effacement — seules les branches et les tags couvrent, et `copy check` refait la couverture
+     (`COPY_COVERAGE`), fichiers rendus compris, au commit de l'original enregistré au retour
+     (`original_head`) ;
+  4. un script écrit depuis une copie, sur son registre périmé, effaçait une copie que l'original
+     avait gardée — les commandes `copy` ne tournent que dans l'original (`COPY_ORIGINAL`), et
+     l'audit d'une copie ne juge pas les copies ;
+  5. avec une table de correspondance (`PROJECT_CONTROL_PATH_MAP`), le script contrôlait un dossier
+     et en effaçait un autre — il tourne sans table ;
+  6. un nom enregistré contenant un saut de ligne devenait une commande du script — chemins, noms,
+     identifiants et jetons sont validés en entier, et le script ne porte plus aucun nom du registre ;
+  7. un point de montage dans une copie aurait été traversé par l'effacement — refusé, comme un
+     fichier spécial (un tube bloquait le contrôle) et un dossier illisible ;
+  8. une copie enregistrée par un autre original, logée dans celle-ci, partait avec elle — refusée ;
+  9. `core.worktree` détournait la lecture vers un autre dossier — Git est lancé avec le dépôt et le
+     dossier de travail nommés ;
+  10. le contrôle regardait la place avant le long parcours — il la regarde avant, pour ne jamais
+     parcourir un dossier qui n'est pas la copie, et **après**, au plus près de l'effacement.
+  Deux défauts de plus trouvés en fermant ceux-là : lire une copie lançait la commande
+  `core.fsmonitor` que sa configuration nomme — coupée pour toute lecture d'une copie ; et le
+  script efface désormais depuis le dossier parent, où il se place et dont il vérifie qu'il est
+  physiquement celui qui a été contrôlé : un lien glissé plus haut ne détourne rien. Les fichiers
+  `.DS_Store` que le Finder écrit en montrant un dossier ne comptent plus. Écrit comme limite : le
+  rôle d'un fichier rendu (`mandat`…) est déclaré, pas vérifié — le contrôleur prouve des octets.
+- **Relecture du code par la seconde IA** (Codex, `RELECTURE_CODE_P21.md`, verdict
+  `CODE_P21_REQUIRES_MAJOR_REDLINE`) : six constats, tous rejoués en essais — rouges sur le code
+  relu (`0ecb546`), verts après correction — et fermés ici :
+  1. `R01` — un commit que seul le côté « ancien » d'une entrée de reflog atteint encore sortait de
+     l'inventaire (il était croisé avec les seules cibles affichées) : tout commit que les reflogs
+     atteignent et qu'aucune référence n'atteint est un élément, et une erreur de lecture refuse ;
+  2. `R02` — l'origine d'un export n'était pas couverte : un `source/` intact ne vaut que tant que
+     l'original garde la révision d'où il vient ; elle devient un élément (`origin:<commit>`), gardé
+     par une branche ou un tag, ou abandonné par son nom, au retour et avant tout effacement ;
+  3. `R03` — deux inventaires différents pouvaient avoir la même empreinte (lignes sans
+     échappement, et un lien peut pointer vers un texte à tabulation et saut de ligne) : l'empreinte
+     se calcule sur du JSON canonique ;
+  4. `R04` — lire un clone partiel lançait le transport que sa configuration nomme, pour aller
+     chercher un objet manquant : un clone partiel est refusé avant toute lecture, la récupération à
+     la demande est coupée (`GIT_NO_LAZY_FETCH`) et tout transport interdit à la lecture ;
+  5. `R05` — un clone sans fiche de sortie, qui hérite du registre, pouvait y écrire une fausse
+     clôture : les commandes qui écrivent le registre refusent un registre écrit par un autre
+     original ;
+  6. `R06` — une copie enregistrée cachée sous `.git/hooks` n'était pas refusée : une copie
+     enregistrée ou un dépôt, n'importe où dans `.git`, est refusé. Reste écrit comme limite : un
+     simple fichier glissé dans `objects/`, `refs/` ou `logs/` n'est pas inventorié.
+  Un défaut de plus, de la famille de `R04`, trouvé en fermant `R01` : l'ancienne lecture des
+  reflogs passait par une commande de journal (`git reflog show`) qui, avec `log.showSignature`,
+  vérifie chaque commit signé avec le programme que la copie nomme (`gpg.program`) — démontré avec
+  une signature factice. Les reflogs se lisent désormais par une commande de bas niveau, qui ne
+  vérifie rien ; `core.alternateRefsCommand` compte parmi les réglages qui ont un sens.
+- **Relecture courte du code** (Codex, `RELECTURE_COURTE_CODE_P21.md`, verdict
+  `CODE_P21_V2_REQUIRES_MAJOR_REDLINE`) : `R01` à `R06` et `C-01` fermés sur leurs reproductions ;
+  un défaut nouveau, introduit par la correction de `R06` — `N01` : le parcours de `.git` ouvrait
+  tout fichier nommé `copie.json` pour y chercher une fiche, et un tube de ce nom bloquait le
+  contrôle. Fermé : une fiche de sortie n'est lue que si c'est un petit fichier ordinaire (type
+  vérifié avant et après l'ouverture, jamais à travers un lien) ; tout fichier de la copie est lu de
+  même ; chaque entrée de `.git` est typée d'après la liste du dossier, sans être ouverte, et un
+  fichier spécial, où qu'il soit, est refusé avant que Git ne soit lancé — Git ouvre ses fichiers
+  (`HEAD`, `config`, index, références) et y attendrait. En plus, pour ce que le contrôleur ne voit
+  pas (une inclusion de configuration hors de la copie qui serait un tube, un volume disparu),
+  toute lecture d'une copie par Git est bornée à cinq minutes : au-delà, la copie est refusée.
+- **Contrôle de `N01`** (Codex, `CONTROLE_N01_P21.md`, verdict `CODE_P21_N01_REQUIRES_MAJOR_REDLINE`) :
+  `N01` fermé — les tubes sous `.git/hooks/`, dans `objects/`, à la place de `HEAD`, de `config`, de
+  l'index, d'une référence ou de la fiche sont refusés en moins d'une seconde, et l'inclusion vers un
+  tube l'est au bout de la borne de cinq minutes. Un défaut nouveau, introduit par cette correction —
+  `N02` : la fiche d'une copie imbriquée, agrandie d'espaces au-delà de 64 Kio, était lue comme
+  « pas de fiche », et la copie qu'elle désigne passait le contrôle. Fermé : tout fichier nommé
+  `copie.json` est refusé comme une copie imbriquée, sauf s'il est clairement autre chose — du JSON
+  du projet, sans `copy_id` ni `token` ; trop grand pour être lu, illisible, écrit autrement qu'en
+  JSON UTF-8 (un autre encodage, une fiche abîmée) ou ressemblant à une fiche sans se lire comme
+  telle, il est refusé ; aucun fichier de ce nom n'a sa place dans `.git` ; une marque d'octets en
+  tête d'une fiche est admise. Écrit comme limite : une fiche se reconnaît à son nom et à sa place —
+  renommée ou déplacée, elle n'est plus une fiche.
+- **Contrôle de `N02`** (Codex, `CONTROLE_N02_P21.md`, verdict `CODE_P21_N02_REQUIRES_MINOR_REDLINE`) :
+  `N02` fermé — la fiche agrandie est refusée en un tiers de seconde ; les données de projet nommées
+  `copie.json` (objet sans champ d'identité, liste, chaîne, marque d'octets, 65 536 octets) passent,
+  et la fiche de chaque copie à sa place aussi. Un faux refus, né de cette correction — `N03`, mineur :
+  un original nommé `source`, dont le dossier parent contient un `copie.json` qui n'est qu'une liste,
+  était pris pour le `source/` d'un export. Fermé : la même règle sert partout — un fichier de ce nom
+  voisin d'un dépôt `source` n'en fait une copie que s'il peut être une fiche (fiche enregistrée, trop
+  grand pour être lu, illisible, pas du JSON UTF-8, ou ressemblant à une fiche).
+- Essais : 37 nouveaux, dont les trois cas partiels de la relecture courte du cadrage (`.git` et
+  reflog ; vieux script après déplacement ; réparation de deux copies en une transaction), dix pour
+  la revue indépendante, six pour la relecture du code (l'un de ses constats étend un essai existant),
+  un pour la relecture courte du code et un pour chacun des contrôles de `N01` et de `N02` ; 220 au
+  total.
+- Papiers rangés tels quels (octets identiques). Du cadrage : fiches `p21-scope-tableau-des-cles`
+  (V3), `-v2`, `-v1` et les deux mandats sous `provenance/maintenance/scopes/` ; les trois relectures,
+  les deux contre-revues, la provenance de la source et le rapport de mesure sous
+  `provenance/maintenance/2026-09-28-*`. Du code : le rapport de construction, les deux relectures et
+  les deux contrôles de la seconde IA, et leurs quatre contre-revues, sous
+  `provenance/maintenance/2026-09-28-*` et `2026-09-29-*` ; leurs quatre mandats, et celui d'un
+  contrôle de `N03` préparé mais non utilisé, sous `provenance/maintenance/scopes/p21-mandat-*` ; la
+  table `provenance/maintenance/2026-09-29-papiers-relecture-code-p21.md` relie chaque papier au nom
+  sous lequel les autres le citent.
+- Manifeste régénéré (`skeleton_version` `3.21.0`, 25 fichiers core), démo et transcript régénérés,
+  feuille de route mise à jour (version `3.21.0`, chantier `P21`, idée `ID-024`, état « maintenant »).
+- Commits passés sous `PROJECT_CONTROL_HOOK_OVERRIDE="TPL-D-080"` (le squelette est en mode amorçage),
+  sauf les deux derniers — la décision de livraison et la vue qui la suit —, sous `TPL-D-081`.
+- Livraison : `TPL-D-081` — la branche est récupérée dans l'atelier depuis le dossier de chantier,
+  sans checkout ; `main`, les tags et les remotes de l'atelier ne changent pas.
+- Non fait : promotion, tag, envoi, release, miroir public, montée d'Alpha ; retour
+  puis effacement du dossier de relecture et du dossier de chantier — les premières copies à rendre
+  leurs clés.
 
 ## 2026-09-27 — `claude/v3.20.2-source-de-template-vierge` — la fausse nouvelle version repart de registres vierges
 

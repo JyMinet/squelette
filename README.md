@@ -58,7 +58,7 @@ Language: english (EN)
 Branch: work/wi-001-greeting | HEAD: <commit>
 Checks: PASS
 Commit gate: installed outside the worktree
-Skeleton: 3.20.2 | core aligned
+Skeleton: 3.21.1 | core aligned
 Roadmap view: absent — roadmap-view --write
 Work Items done: 1 | Blocked: 0
 WI-001 — Greeting module: IN_PROGRESS
@@ -75,7 +75,7 @@ COMMAND: preflight
 WORK_ITEM_ID: WI-001
 BRANCH: work/wi-001-greeting
 HEAD: <commit>
-… 18 controls PASS …
+… 20 controls PASS …
 FAIL: BUSINESS_CHANGE_AUTHORIZATION — path outside Work Item authorization: modules/billing/invoice.py
 … 18 controls PASS …
 FAIL: AUTHORIZED_PATHS — path outside Work Item authorization: modules/billing/invoice.py
@@ -89,7 +89,7 @@ Language: english (EN)
 Branch: main | HEAD: <commit>
 Checks: PASS
 Commit gate: installed outside the worktree
-Skeleton: 3.20.2 | core aligned
+Skeleton: 3.21.1 | core aligned
 Roadmap view: current
 Work Items done: 2 | Blocked: 0
 Next action: Project at rest; wait for an authorized objective.

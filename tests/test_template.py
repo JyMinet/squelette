@@ -342,6 +342,11 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
         ):
             for path in (root / directory).glob("*.json"):
                 path.unlink()
+        # The register of the copies (P21) belongs to the repository that made them — the template
+        # keeps the workshop's own, a project its own. A pristine copy starts with no copy registered.
+        for register in ("provenance/copies-state.v1.json", "project_control/copies-state.v1.json"):
+            if (root / register).is_file():
+                (root / register).unlink()
 
     def authorized_work_item(self, base_head: str, work_item_id: str = "WI-001") -> dict:
         item = copy.deepcopy(self.work_item)
@@ -3119,6 +3124,35 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
         self.assertIn("PASS: UPGRADE_REHEARSAL", applied.stdout)
         self.assertIn("PASS: IDEAS", run_control(root, "audit").stdout)
 
+    def test_the_tests_of_the_keys_run_from_a_derived_project(self) -> None:
+        """B17. A derived project runs this same suite on itself, and it holds neither the journal
+        of the template (`provenance/CHANGELOG.md`) nor its licence — neither is a core file.
+        Measured on a real project in the rehearsal of its upgrade to 3.21.0: four tests of the
+        copies failed there before testing anything they were written for — three wrote their
+        ticket into a journal the fixture copy did not have, one hid its change in the licence.
+        The tests of the copies lean only on what every project holds, and a fixture copy that
+        needs a template journal starts one: replayed from a derived project without those two
+        files, the four pass."""
+        temporary, derived = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        self.assertEqual(load_json(derived / "project_control/project-state.v1.json")["repository_role"], "PROJECT")
+        for name in ("provenance/CHANGELOG.md", "LICENSE"):
+            (derived / name).unlink(missing_ok=True)
+        replayed = [
+            "test_the_tag_goes_on_returned_keys_and_a_late_repair_covers_every_copy_at_once",
+            "test_the_register_is_committed_on_the_reference_branch_only",
+            "test_a_repair_never_hides_another_failure",
+            "test_the_inventory_walks_the_folder_and_nothing_git_hides_escapes_it",
+        ]
+        result = subprocess.run(
+            [sys.executable, "-B", "-m", "unittest",
+             *(f"tests.test_template.GeneralProjectSkeletonTests.{name}" for name in replayed)],
+            cwd=derived, check=False, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"Ran {len(replayed)} tests", result.stderr, result.stderr)
+        self.assertNotIn("skipped", result.stderr, "they run in a derived project; none of them skips")
+
     def test_a_baseline_leaves_only_on_a_decision_that_names_the_removal(self) -> None:
         """Step 2 of the scenario the third control executed: a Work Item legitimately authorised
         to write the project state sets the adoption baseline to null and commits — an ordinary
@@ -3563,6 +3597,8 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
             self.assertIsNone(acronym.search(relative), f"the acronym survives in the name {relative}")
         self.assertFalse((target / "provenance/maintenance/publication").exists(),
                          "the export tool names what the copy must not carry: it stays private")
+        self.assertFalse((target / "provenance/copies-state.v1.json").exists(),
+                         "the workshop's copy register stays in the workshop: the mirror starts with none")
         manifest = load_json(target / "provenance/core-manifest.v1.json")
         for relative in list(manifest["core"]) + ["provenance/core-manifest.v1.json"]:
             at_head = run_git(ROOT, "show", f"HEAD:{relative}")
@@ -4192,7 +4228,8 @@ class GeneralProjectSkeletonTests(unittest.TestCase):
         head_before = run_git(root, "rev-parse", "HEAD").stdout.strip()
         rerun = run_control(root, "template-upgrade", "--source", str(upstream), "--apply")
         self.assertNotEqual(rerun.returncode, 0, "the rerun must audit with the new controller, and refuse")
-        self.assertIn("PASS: UPGRADE_PLAN — 9.9.9 -> 9.9.9: identical 24", rerun.stdout)
+        # The count follows the core: a hard-coded number broke when a version added a core file.
+        self.assertIn(f"PASS: UPGRADE_PLAN — 9.9.9 -> 9.9.9: identical {len(manifest['core'])}", rerun.stdout)
         self.assertIn("FAIL: UPGRADE_REHEARSAL", rerun.stdout)
         self.assertIn("docs/governance/DATA_RETENTION.md", rerun.stdout)
         self.assertIn("FAIL: APPLY — refused", rerun.stdout)
@@ -6895,6 +6932,1293 @@ except KeyboardInterrupt:
         )
         self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
         self.assertIn("match the controller's output", checked.stdout)
+
+    # --- Copies of the repository (P21, « tableau des clés ») -------------------------------
+
+    COPY_FIXTURE_CONFIRMATIONS = (
+        "Confirmation 1: « Oui » (fixture)\n"
+        "Confirmation 2: « Confirmé : copie dans le dossier nommé ci-dessus » (fixture)\n"
+    )
+
+    def run_copy(self, root: Path, *arguments: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+        environment = {key: value for key, value in os.environ.items() if key != "PROJECT_CONTROL_PATH_MAP"}
+        environment.update(env or {})
+        return subprocess.run(
+            [sys.executable, "-B", "scripts/project_control.py", "copy", *arguments],
+            cwd=root, check=False, capture_output=True, text=True, env=environment,
+        )
+
+    def record_copy_decision(self, root: Path, decision_id: str, folder: str, *, chosen: str = "AUTHORIZE",
+                             confirmations: bool = True) -> str:
+        """A Human Decision whose Folder scope names `folder`, with its two confirmations."""
+        path = root / "docs/governance/HUMAN_DECISIONS.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").rstrip() + "\n"
+            f"\n## {decision_id}\n\n"
+            f"Date: {self.control_module.today_iso()}\n"
+            f"Decision: Open a copy of the project in {folder}.\n"
+            "Options considered: AUTHORIZE | REJECT\n"
+            f"Chosen option: {chosen}\n"
+            "Related Work Item: NOT_APPLICABLE\n"
+            f"Folder scope: {folder}\n"
+            + (self.COPY_FIXTURE_CONFIRMATIONS if confirmations else "")
+            + "Authorized by: Project Owner\n",
+            encoding="utf-8",
+        )
+        return self.commit_fixture(root, f"chore: authorize a copy ({decision_id})")
+
+    def record_template_copy_decision(self, root: Path, decision_id: str, folder: str, *, structured: bool = True,
+                                      override: str | None = None) -> str:
+        """A template decision (TPL-D) that opens a copy of the template: structured lines since P21."""
+        path = root / "provenance/CHANGELOG.md"
+        # A derived project carries no journal of the template: its fixture copy, a template
+        # again, starts one — the ticket needs a journal, not the template's history.
+        journal = path.read_text(encoding="utf-8").rstrip() if path.is_file() else "# Changelog du template"
+        lines = [f"- `{decision_id}` — **Copie de travail (essai).** Ouvrir une copie du template."]
+        if structured:
+            lines += [f"  Folder scope: {folder}", "  Confirmation 1: « Oui » (fixture)",
+                      "  Confirmation 2: « Confirmé : copie dans le dossier nommé » (fixture)"]
+        else:
+            lines += [f"  Le dossier est {folder}, confirmé deux fois."]
+        path.write_text(journal + "\n\n## Décisions d'essai\n\n" + "\n".join(lines) + "\n", encoding="utf-8")
+        if override is None:
+            return self.commit_fixture(root, f"chore(provenance): {decision_id}")
+        self.assertEqual(run_git(root, "add", "provenance/CHANGELOG.md").returncode, 0)
+        committed = run_git(root, "-c", "user.name=Fixture Owner", "-c", "user.email=fixture@example.invalid",
+                            "commit", "-q", "-m", f"chore(provenance): {decision_id}",
+                            env={"PROJECT_CONTROL_HOOK_OVERRIDE": override})
+        self.assertEqual(committed.returncode, 0, committed.stdout + committed.stderr)
+        return run_git(root, "rev-parse", "HEAD").stdout.strip()
+
+    def open_copy(self, root: Path, folder: Path, ticket: str, *, kind: str = "CLONE", usage: str = "chantier",
+                  closes_with: str = "9.9.9", fate: str = "RETURN_THEN_ERASE", due: str = "2999-01-01",
+                  origin: str = "HEAD", env: dict[str, str] | None = None,
+                  declared: str | None = None) -> tuple[str, dict]:
+        opened = self.run_copy(root, "open", "--path", declared or str(folder), "--kind", kind, "--usage", usage,
+                               "--ticket", ticket, "--closes-with", closes_with, "--fate", fate, "--due", due,
+                               "--origin", origin, env=env)
+        self.assertEqual(opened.returncode, 0, opened.stdout + opened.stderr)
+        copy_id = re.search(r"(?m)^COPY_ID: (COPY-[0-9]{3,})$", opened.stdout).group(1)
+        slip = json.loads(re.search(r"(?m)^COPY_SLIP: (.*)$", opened.stdout).group(1))
+        return copy_id, slip
+
+    def make_clone_copy(self, root: Path, folder: Path, slip: dict | None) -> None:
+        """The copy gesture: a clone without remote, the exit slip placed in its .git."""
+        cloned = run_git(root.parent, "clone", "-q", str(root), str(folder))
+        self.assertEqual(cloned.returncode, 0, cloned.stdout + cloned.stderr)
+        removed = run_git(folder, "remote", "remove", "origin")
+        self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+        if slip is not None:
+            (folder / ".git/copie.json").write_text(json.dumps(slip, indent=2) + "\n", encoding="utf-8")
+
+    def write_proofs(self, directory: Path, name: str, returns: list[dict]) -> Path:
+        path = directory / name
+        path.write_text(json.dumps({"returns": returns}, indent=2) + "\n", encoding="utf-8")
+        return path
+
+    def copy_register(self, root: Path) -> dict:
+        state = load_json(root / "project_control/project-state.v1.json")
+        relative = "provenance/copies-state.v1.json" if state["repository_role"] == "PROJECT_TEMPLATE" else "project_control/copies-state.v1.json"
+        return load_json(root / relative)
+
+    def commit_in_copy(self, folder: Path, message: str) -> str:
+        committed = run_git(folder, "-c", "user.name=Fixture Owner", "-c", "user.email=fixture@example.invalid",
+                            "commit", "-q", "--allow-empty", "-m", message,
+                            env={"PROJECT_CONTROL_HOOK_OVERRIDE": "fixture: work done inside a copy"})
+        self.assertEqual(committed.returncode, 0, committed.stdout + committed.stderr)
+        return run_git(folder, "rev-parse", "HEAD").stdout.strip()
+
+    def test_a_folder_scope_covers_a_folder_as_a_whole_path_never_as_a_prefix(self) -> None:
+        covers = self.control_module.folder_scope_covers
+        self.assertTrue(covers("/work/projects/app-chantier-p1, copie sans liens", "/work/projects/app-chantier-p1"))
+        self.assertTrue(covers("dossier /work/projects accordé", "/work/projects/app-chantier-p1"))
+        self.assertTrue(covers("« /work/projects/app-chantier-p1 ».", "/work/projects/app-chantier-p1"))
+        self.assertFalse(covers("/work/projects/app-chantier-p1", "/work/projects/app-chantier-p1-2"))
+        self.assertFalse(covers("/work/projects/app-chantier-p1.bak", "/work/projects/app-chantier-p1"))
+        self.assertFalse(covers("/work", "/work/projects/app-chantier-p1"), "the first level is never a granted folder")
+        block = self.control_module.template_decision_block(
+            "## Décisions\n\n- `TPL-D-901` — **Titre.** Prose\n  qui continue.\n  Folder scope: /work/a\n"
+            "  Confirmation 1: « Oui »\n  Confirmation 2: « Confirmé »\n- `TPL-D-902` — **Autre.**\n", "TPL-D-901")
+        self.assertIn("Folder scope: /work/a\n", block)
+        self.assertNotIn("TPL-D-902", block)
+        self.assertEqual(self.control_module.out_of_folder_decision_errors(block), [])
+        self.assertIsNone(self.control_module.template_decision_block("- `TPL-D-9` — a\n- `TPL-D-9` — b\n", "TPL-D-9"))
+
+    def test_a_project_without_a_copy_register_audits_as_before(self) -> None:
+        """Non-regression: no register means no copy registered, and nothing new in status."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        audit = run_control(root, "audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
+        self.assertIn("PASS: COPIES_REGISTER — no copy of this repository is registered", audit.stdout)
+        self.assertIn("PASS: COPIES_RETURNED", audit.stdout)
+        status = run_control(root, "status")
+        self.assertNotIn("Copies", status.stdout)
+        self.assertNotIn("COPIE", status.stdout)
+        template_temporary, template = self.make_copy()
+        self.addCleanup(template_temporary.cleanup)
+        bootstrap = run_control(template, "bootstrap-audit")
+        self.assertEqual(bootstrap.returncode, 0, bootstrap.stdout + bootstrap.stderr)
+
+    def test_a_copy_is_neither_the_original_nor_inside_it_nor_around_it(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_copy_decision(root, "HD-120", str(base))
+        first = base / "project-chantier-p1"
+        self.open_copy(root, first, "HD-120")
+        first.mkdir()
+        (base / "elsewhere").mkdir()
+        (base / "link-to-base").symlink_to(base, target_is_directory=True)
+        refused = {
+            "the original": root,
+            "inside the original": root / "reports/project-chantier-p2",
+            "around the original": base,
+            "inside another copy": first / "project-chantier-p3",
+            "around another copy": base,
+            "through a link": base / "link-to-base/project-chantier-p4",
+            "on an absent volume": base / "absent-volume/project-chantier-p5",
+        }
+        for label, path in refused.items():
+            opened = self.run_copy(root, "open", "--path", str(path), "--kind", "CLONE", "--usage", "chantier",
+                                   "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE", "--due", "2999-01-01")
+            self.assertNotEqual(opened.returncode, 0, f"{label}: {opened.stdout}")
+            self.assertIn("copy open refused", opened.stdout, label)
+        self.assertEqual(len(self.copy_register(root)["copies"]), 1, "a refusal registers nothing")
+
+    def test_copy_open_refuses_names_tickets_and_targets_it_cannot_honour(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_copy_decision(root, "HD-120", str(base / "project-chantier-p1"))
+        self.record_copy_decision(root, "HD-121", str(base / "project-chantier-p2"), chosen="REJECT")
+        self.record_copy_decision(root, "HD-122", str(base / "project-chantier-p3"), confirmations=False)
+        cases = {
+            "a copy is named": ("HD-120", base / "copie-de-travail", "chantier", "9.9.9", "2999-01-01"),
+            "the name says chantier, the copy is declared revue": ("HD-120", base / "project-chantier-p1", "revue", "9.9.9", "2999-01-01"),
+            "HD-199: not recorded": ("HD-199", base / "project-chantier-p1", "chantier", "9.9.9", "2999-01-01"),
+            "Chosen option is not AUTHORIZE": ("HD-121", base / "project-chantier-p2", "chantier", "9.9.9", "2999-01-01"),
+            "requires Confirmation 1": ("HD-122", base / "project-chantier-p3", "chantier", "9.9.9", "2999-01-01"),
+            "its Folder scope names neither": ("HD-120", base / "project-chantier-p9", "chantier", "9.9.9", "2999-01-01"),
+            "already closed (DONE)": ("HD-120", base / "project-chantier-p1", "chantier", "WI-000", "2999-01-01"),
+            "WI-404: unknown Work Item": ("HD-120", base / "project-chantier-p1", "chantier", "WI-404", "2999-01-01"),
+            "--due must be YYYY-MM-DD": ("HD-120", base / "project-chantier-p1", "chantier", "9.9.9", "demain"),
+        }
+        for expected, (ticket, path, usage, target, due) in cases.items():
+            opened = self.run_copy(root, "open", "--path", str(path), "--kind", "CLONE", "--usage", usage,
+                                   "--ticket", ticket, "--closes-with", target, "--fate", "ERASE", "--due", due)
+            self.assertNotEqual(opened.returncode, 0, f"{expected}: {opened.stdout}")
+            self.assertIn(expected, opened.stdout)
+        self.assertFalse((root / "project_control/copies-state.v1.json").exists(), "a refusal writes nothing")
+        opened = self.run_copy(root, "open", "--path", str(base / "project-chantier-p1"), "--kind", "CLONE",
+                               "--usage", "chantier", "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE",
+                               "--due", "2999-01-01")
+        self.assertEqual(opened.returncode, 0, opened.stdout + opened.stderr)
+        self.assertIn("chore(project-control): copy COPY-001 opened", run_git(root, "log", "-1", "--format=%s").stdout)
+        tagged = run_git(root, "tag", "v9.9.8")
+        self.assertEqual(tagged.returncode, 0, tagged.stderr)
+        refused = self.run_copy(root, "open", "--path", str(base / "project-chantier-p2"), "--kind", "CLONE",
+                                "--usage", "chantier", "--ticket", "HD-120", "--closes-with", "9.9.8", "--fate", "ERASE",
+                                "--due", "2999-01-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("already tagged", refused.stdout)
+
+    def test_a_clone_comes_back_only_when_every_item_is_back_or_abandoned_by_name(self) -> None:
+        """N1/R02: the working tree, ignored folders file by file, the stash, the reflog and what
+        `.git` holds of the owner's all count; the installed gate identical to its reference does not."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        folder = base / "project-chantier-p1"
+        self.record_copy_decision(root, "HD-120", str(folder))
+        copy_id, slip = self.open_copy(root, folder, "HD-120")
+        self.make_clone_copy(root, folder, slip)
+        installed = run_control(folder, "install-gate")
+        self.assertEqual(installed.returncode, 0, installed.stdout + installed.stderr)
+        empty = self.write_proofs(base, "empty.json", [{"copy_id": copy_id}])
+        fresh = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertEqual(fresh.returncode, 0, "a fresh clone with its gate holds nothing of its own: " + fresh.stdout)
+        # Now the copy holds work of its own, in every place a clone can hold it.
+        (folder / "notes").mkdir()
+        (folder / "notes/unique.md").write_text("une note née dans la copie\n", encoding="utf-8")
+        (folder / "README.md").write_text((folder / "README.md").read_text(encoding="utf-8") + "\nretouche\n", encoding="utf-8")
+        (folder / ".git/info/exclude").write_text("scratch/\n", encoding="utf-8")
+        (folder / "scratch/deep").mkdir(parents=True)
+        (folder / "scratch/deep/paper.md").write_text("au fond d'un dossier ignoré\n", encoding="utf-8")
+        (folder / ".git/hooks/pre-push").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        (folder / "stash.txt").write_text("à mettre de côté\n", encoding="utf-8")
+        self.assertEqual(run_git(folder, "add", "stash.txt").returncode, 0)
+        stashed = run_git(folder, "-c", "user.name=F", "-c", "user.email=f@example.invalid", "stash", "push", "-q", "--", "stash.txt")
+        self.assertEqual(stashed.returncode, 0, stashed.stdout + stashed.stderr)
+        self.assertEqual(run_git(folder, "switch", "-q", "-c", "lost").returncode, 0)
+        lost = self.commit_in_copy(folder, "travail sur une branche ensuite supprimée")
+        self.assertEqual(run_git(folder, "switch", "-q", "main").returncode, 0)
+        self.assertEqual(run_git(folder, "branch", "-q", "-D", "lost").returncode, 0)
+        refused = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertNotEqual(refused.returncode, 0)
+        for item in ("worktree:notes/unique.md", "worktree:README.md", "worktree:scratch/deep/paper.md",
+                     "git:hooks/pre-push", "git:info/exclude", "ref:refs/stash", f"reflog:{lost}"):
+            self.assertIn(item, refused.stdout)
+        self.assertNotIn("git:hooks/pre-commit", refused.stdout, "the installed gate identical to its reference is not an item")
+        (folder / ".git/hooks/pre-commit").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        mentions = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertIn("git:hooks/pre-commit", mentions.stdout, "a gate that differs from its reference is an item")
+        (root / "reports/copies").mkdir(parents=True, exist_ok=True)
+        (root / "reports/copies/unique.md").write_bytes((folder / "notes/unique.md").read_bytes())
+        self.commit_fixture(root, "chore: the note of the copy comes back")
+        proofs = self.write_proofs(base, "proofs.json", [{
+            "copy_id": copy_id,
+            "files": [{"item": "worktree:notes/unique.md", "path": "reports/copies/unique.md", "role": "note"}],
+            "abandon": [
+                {"item": "worktree:README.md", "reason": "retouche d'essai"},
+                {"item": "worktree:scratch/", "reason": "brouillons jetables"},
+                {"item": "git:", "reason": "réglages locaux de la copie"},
+                {"item": "ref:refs/stash", "reason": "mise de côté d'essai"},
+                {"item": "reflog:", "reason": "branche d'essai supprimée"},
+            ],
+        }])
+        returned = self.run_copy(root, "return", "--proofs", str(proofs))
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+        entry = self.copy_register(root)["copies"][0]
+        self.assertEqual(entry["state"], "RETURNED")
+        self.assertRegex(entry["content_digest"], r"^[a-f0-9]{64}$")
+        self.assertEqual(entry["returns"][-1]["files"][0]["path"], "reports/copies/unique.md")
+        audit = run_control(root, "audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout + audit.stderr)
+
+    def test_a_copy_holding_what_the_controller_cannot_return_is_refused_whole(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_copy_decision(root, "HD-120", str(base))
+        cases = {
+            "unknown entry in .git: rr-cache": lambda folder: (folder / ".git/rr-cache").mkdir(),
+            "a Git operation is in progress in the copy: .git/MERGE_HEAD":
+                lambda folder: (folder / ".git/MERGE_HEAD").write_text(run_git(folder, "rev-parse", "HEAD").stdout, encoding="utf-8"),
+            "linked worktrees (.git/worktrees) are not supported":
+                lambda folder: self.assertEqual(run_git(folder, "worktree", "add", "-q", str(folder.parent / (folder.name + "-lie"))).returncode, 0),
+        }
+        for number, (message, spoil) in enumerate(cases.items(), start=1):
+            folder = base / f"project-chantier-p{number}"
+            copy_id, slip = self.open_copy(root, folder, "HD-120")
+            self.make_clone_copy(root, folder, slip)
+            spoil(folder)
+            proofs = self.write_proofs(base, f"proofs-{number}.json", [{"copy_id": copy_id, "abandon": [{"item": "worktree:", "reason": "x"}]}])
+            refused = self.run_copy(root, "return", "--proofs", str(proofs))
+            self.assertNotEqual(refused.returncode, 0, message)
+            self.assertIn(message, refused.stdout)
+
+    def test_an_export_comes_back_with_its_mandate_committed_in_the_original(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        folder = base / "project-revue-9.9.9"
+        self.record_copy_decision(root, "HD-120", str(folder))
+        origin = run_git(root, "rev-parse", "HEAD").stdout.strip()
+        copy_id, slip = self.open_copy(root, folder, "HD-120", kind="EXPORT", usage="revue", origin=origin)
+        (folder / "source").mkdir(parents=True)
+        archive = subprocess.run(["git", "archive", origin], cwd=root, capture_output=True, check=False)
+        self.assertEqual(archive.returncode, 0)
+        subprocess.run(["tar", "-x", "-C", str(folder / "source")], input=archive.stdout, check=True)
+        (folder / "copie.json").write_text(json.dumps(slip) + "\n", encoding="utf-8")
+        (folder / "MANDAT.md").write_text("# Mandat de revue\n", encoding="utf-8")
+        (folder / "RAPPORT.md").write_text("# Rapport\n", encoding="utf-8")
+        (folder / "runs/fixture").mkdir(parents=True)
+        (folder / "runs/fixture/a.txt").write_text("jetable\n", encoding="utf-8")
+        (folder / "source/README.md").write_text("modifié dans la copie\n", encoding="utf-8")
+        no_mandate = self.write_proofs(base, "p1.json", [{"copy_id": copy_id, "abandon": [
+            {"item": "file:", "reason": "x"}, {"item": "source:", "reason": "x"}]}])
+        refused = self.run_copy(root, "return", "--proofs", str(no_mandate))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("a review comes back with the mandate", refused.stdout)
+        with_mandate = self.write_proofs(base, "p2.json", [{"copy_id": copy_id,
+            "files": [{"item": "file:MANDAT.md", "path": "reports/revue/MANDAT.md", "role": "mandat"},
+                      {"item": "file:RAPPORT.md", "path": "reports/revue/RAPPORT.md", "role": "rapport"}],
+            "abandon": [{"item": "file:runs/", "reason": "fixtures jetables"},
+                        {"item": "source:README.md", "reason": "retouche de relecture"}]}])
+        (root / "reports/revue").mkdir(parents=True)
+        (root / "reports/revue/MANDAT.md").write_bytes((folder / "MANDAT.md").read_bytes())
+        (root / "reports/revue/RAPPORT.md").write_bytes((folder / "RAPPORT.md").read_bytes())
+        uncommitted = self.run_copy(root, "return", "--proofs", str(with_mandate))
+        self.assertNotEqual(uncommitted.returncode, 0, "a paper only lying in the original's folder is not back")
+        self.commit_fixture(root, "chore: the review's papers come back")
+        (root / "reports/revue/RAPPORT.md").write_text("autre chose\n", encoding="utf-8")
+        self.commit_fixture(root, "chore: the report changes")
+        other_bytes = self.run_copy(root, "return", "--proofs", str(with_mandate))
+        self.assertNotEqual(other_bytes.returncode, 0)
+        self.assertIn("committed in the original with other bytes", other_bytes.stdout)
+        (root / "reports/revue/RAPPORT.md").write_bytes((folder / "RAPPORT.md").read_bytes())
+        self.commit_fixture(root, "chore: the report comes back as it is")
+        returned = self.run_copy(root, "return", "--proofs", str(with_mandate))
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+
+    def returned_clone(self) -> tuple[tempfile.TemporaryDirectory, Path, Path, str]:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_copy_decision(root, "HD-120", str(base))
+        folder = base / "project-chantier-p1"
+        copy_id, slip = self.open_copy(root, folder, "HD-120")
+        self.make_clone_copy(root, folder, slip)
+        proofs = self.write_proofs(base, "proofs.json", [{"copy_id": copy_id}])
+        returned = self.run_copy(root, "return", "--proofs", str(proofs))
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+        return temporary, root, folder, copy_id
+
+    def test_copy_check_refuses_rework_a_kept_copy_and_a_folder_in_its_place(self) -> None:
+        """R03: the erasure is judged on the folder as it is today, never on an old proof."""
+        temporary, root, folder, copy_id = self.returned_clone()
+        digest = self.copy_register(root)["copies"][0]["content_digest"]
+        passed = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertEqual(passed.returncode, 0, passed.stdout)
+        (folder / "late.md").write_text("repris après le retour\n", encoding="utf-8")
+        reworked = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertNotEqual(reworked.returncode, 0)
+        self.assertIn("FAIL: COPY_CONTENT", reworked.stdout)
+        (folder / "late.md").unlink()
+        shutil.move(str(folder), str(folder.parent / "put-aside"))
+        folder.mkdir()
+        replaced = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertNotEqual(replaced.returncode, 0)
+        self.assertIn("FAIL: COPY_IDENTITY", replaced.stdout)
+        folder.rmdir()
+        shutil.move(str(folder.parent / "put-aside"), str(folder))
+        self.record_copy_decision(root, "HD-121", str(folder))
+        kept = self.run_copy(root, "close", copy_id, "--state", "KEPT", "--decision", "HD-121")
+        self.assertEqual(kept.returncode, 0, kept.stdout + kept.stderr)
+        after_keep = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertNotEqual(after_keep.returncode, 0)
+        self.assertIn("FAIL: COPY_STATE", after_keep.stdout)
+
+    def test_an_old_erasure_script_refuses_a_copy_that_moved_and_erases_nothing(self) -> None:
+        """N2: the script says which folder, where, in which state; a move invalidates it."""
+        temporary, root, folder, copy_id = self.returned_clone()
+        base = folder.parent
+        script = base / "effacer.sh"
+        written = self.run_copy(root, "cleanup", "--output", str(script))
+        self.assertEqual(written.returncode, 0, written.stdout + written.stderr)
+        text = script.read_text(encoding="utf-8")
+        self.assertIn("set -euo pipefail", text)
+        self.assertIn(f"copy check {copy_id} --path {folder}", text)
+        moved = base / "project-chantier-p1-2"
+        shutil.move(str(folder), str(moved))
+        recorded = self.run_copy(root, "move", copy_id, "--path", str(moved))
+        self.assertEqual(recorded.returncode, 0, recorded.stdout + recorded.stderr)
+        self.make_clone_copy(root, folder, None)
+        (folder / "someone-else.md").write_text("un autre travail, venu à la même place\n", encoding="utf-8")
+        ran = subprocess.run(["bash", str(script)], capture_output=True, text=True, check=False)
+        self.assertNotEqual(ran.returncode, 0, ran.stdout)
+        self.assertIn("FAIL: COPY_BINDING", ran.stdout)
+        self.assertTrue((folder / "someone-else.md").exists(), "the old script erased nothing")
+        self.assertTrue(moved.is_dir())
+        fresh_script = base / "effacer-2.sh"
+        self.assertEqual(self.run_copy(root, "cleanup", "--output", str(fresh_script)).returncode, 0)
+        ran = subprocess.run(["bash", str(fresh_script)], capture_output=True, text=True, check=False)
+        self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
+        self.assertFalse(moved.exists(), "the regenerated script erases the copy where it now is")
+        self.assertTrue((folder / "someone-else.md").exists(), "and never the folder that took its old place")
+        closed = self.run_copy(root, "close", copy_id, "--state", "ERASED")
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        self.assertEqual(self.copy_register(root)["copies"][0]["state"], "ERASED")
+
+    def test_a_reworked_copy_is_returned_again_before_it_can_be_erased(self) -> None:
+        temporary, root, folder, copy_id = self.returned_clone()
+        first = self.copy_register(root)["copies"][0]["content_digest"]
+        (folder / "late.md").write_text("repris après le retour\n", encoding="utf-8")
+        self.assertNotEqual(self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", first).returncode, 0)
+        proofs = self.write_proofs(folder.parent, "again.json", [{"copy_id": copy_id, "abandon": [{"item": "worktree:late.md", "reason": "brouillon"}]}])
+        again = self.run_copy(root, "return", "--proofs", str(proofs))
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        entry = self.copy_register(root)["copies"][0]
+        self.assertNotEqual(entry["content_digest"], first)
+        self.assertEqual(len(entry["returns"]), 2)
+        self.assertEqual(self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", entry["content_digest"]).returncode, 0)
+
+    def test_copy_close_says_erased_only_when_the_folder_is_gone_and_kept_only_by_decision(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_copy_decision(root, "HD-120", str(base))
+        volume = base / "volume"
+        volume.mkdir()
+        folder = volume / "project-chantier-p1"
+        copy_id, slip = self.open_copy(root, folder, "HD-120")
+        self.make_clone_copy(root, folder, slip)
+        still_open = self.run_copy(root, "close", copy_id, "--state", "ERASED")
+        self.assertNotEqual(still_open.returncode, 0, "an OPEN copy is returned before it is erased")
+        proofs = self.write_proofs(base, "proofs.json", [{"copy_id": copy_id}])
+        self.assertEqual(self.run_copy(root, "return", "--proofs", str(proofs)).returncode, 0)
+        there = self.run_copy(root, "close", copy_id, "--state", "ERASED")
+        self.assertNotEqual(there.returncode, 0)
+        self.assertIn("still exists", there.stdout)
+        shutil.move(str(volume), str(base / "unmounted"))
+        unavailable = self.run_copy(root, "close", copy_id, "--state", "ERASED")
+        self.assertNotEqual(unavailable.returncode, 0)
+        self.assertIn("unavailable is not erased", unavailable.stdout)
+        shutil.move(str(base / "unmounted"), str(volume))
+        no_decision = self.run_copy(root, "close", copy_id, "--state", "KEPT")
+        self.assertNotEqual(no_decision.returncode, 0)
+        self.record_copy_decision(root, "HD-121", str(folder))
+        kept = self.run_copy(root, "close", copy_id, "--state", "KEPT", "--decision", "HD-121")
+        self.assertEqual(kept.returncode, 0, kept.stdout + kept.stderr)
+        reopen_without = self.run_copy(root, "return", "--proofs", str(proofs))
+        self.assertNotEqual(reopen_without.returncode, 0)
+        self.assertIn("a KEPT copy comes back to a return only by decision", reopen_without.stdout)
+        reopen = self.write_proofs(base, "reopen.json", [{"copy_id": copy_id, "decision": "HD-121"}])
+        self.assertEqual(self.run_copy(root, "return", "--proofs", str(reopen)).returncode, 0)
+        self.assertEqual(self.copy_register(root)["copies"][0]["state"], "RETURNED")
+
+    def test_closing_a_work_item_gives_the_keys_back_first(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        created = self.create_lifecycle_work_item(root, "WI-002", "HD-102")
+        self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+        folder = base / "project-chantier-wi-002"
+        self.record_copy_decision(root, "HD-120", str(folder))
+        copy_id, _ = self.open_copy(root, folder, "HD-120", closes_with="WI-002")
+        closed = run_control(root, "close", "WI-002")
+        self.assertNotEqual(closed.returncode, 0)
+        self.assertIn(f"still has copies OPEN: {copy_id}", closed.stdout)
+
+    def test_the_tag_goes_on_returned_keys_and_a_late_repair_covers_every_copy_at_once(self) -> None:
+        """R05/N3, in the template: the order return → tag keeps the audit green; a tag set too early
+        leaves two copies in fault, and the repair passes the commit gate only as one transaction."""
+        temporary, root = self.make_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        installed = run_control(root, "install-gate")
+        self.assertEqual(installed.returncode, 0, installed.stdout + installed.stderr)
+        self.record_template_copy_decision(root, "TPL-D-901", str(base))
+        self.record_template_copy_decision(root, "TPL-D-902", str(base), structured=False)
+        refused = self.run_copy(root, "open", "--path", str(base / "squelette-chantier-p1"), "--kind", "CLONE",
+                                "--usage", "chantier", "--ticket", "TPL-D-902", "--closes-with", "9.9.9", "--fate", "ERASE",
+                                "--due", "2999-01-01")
+        self.assertNotEqual(refused.returncode, 0, "a template decision without structured lines opens nothing")
+        first, first_slip = self.open_copy(root, base / "squelette-chantier-p1", "TPL-D-901")
+        second, second_slip = self.open_copy(root, base / "squelette-chantier-p2", "TPL-D-901")
+        self.make_clone_copy(root, base / "squelette-chantier-p1", first_slip)
+        self.make_clone_copy(root, base / "squelette-chantier-p2", second_slip)
+        self.assertEqual(run_git(root, "tag", "v9.9.9").returncode, 0)
+        audit = run_control(root, "audit")
+        self.assertNotEqual(audit.returncode, 0)
+        self.assertIn(f"FAIL: COPIES_RETURNED — {first}", audit.stdout)
+        alone = self.write_proofs(base, "alone.json", [{"copy_id": first}])
+        partial = self.run_copy(root, "return", "--proofs", str(alone))
+        self.assertNotEqual(partial.returncode, 0)
+        self.assertIn(f"add {second} to the proofs file", partial.stdout)
+        # While copies are in fault the gate refuses every commit whose audit fails — including the
+        # decision that keeps one: it goes in under an explicit human mandate, like any maintenance.
+        blocked = self.run_copy(root, "open", "--path", str(base / "squelette-chantier-p4"), "--kind", "CLONE",
+                                "--usage", "chantier", "--ticket", "TPL-D-901", "--closes-with", "9.9.10", "--fate", "ERASE",
+                                "--due", "2999-01-01")
+        self.assertNotEqual(blocked.returncode, 0, "nothing new opens while copies are in fault")
+        self.record_template_copy_decision(root, "TPL-D-903", str(base / "squelette-chantier-p2"),
+                                           override="TPL-D-903: garder la seconde copie")
+        together = self.write_proofs(base, "together.json", [{"copy_id": first}, {"copy_id": second, "keep_decision": "TPL-D-903"}])
+        repaired = self.run_copy(root, "return", "--proofs", str(together))
+        self.assertEqual(repaired.returncode, 0, repaired.stdout + repaired.stderr)
+        self.assertIn("chore(project-control): copy", run_git(root, "log", "-1", "--format=%s").stdout,
+                      "the repair went through the installed commit gate")
+        self.assertEqual(run_control(root, "audit").returncode, 0)
+        states = {entry["copy_id"]: entry["state"] for entry in self.copy_register(root)["copies"]}
+        self.assertEqual(states, {first: "RETURNED", second: "KEPT"})
+        # The right order: a new copy for the next version, returned, then the tag.
+        third, third_slip = self.open_copy(root, base / "squelette-chantier-p3", "TPL-D-901", closes_with="9.9.10")
+        self.make_clone_copy(root, base / "squelette-chantier-p3", third_slip)
+        proofs = self.write_proofs(base, "third.json", [{"copy_id": third}])
+        self.assertEqual(self.run_copy(root, "return", "--proofs", str(proofs)).returncode, 0)
+        self.assertEqual(run_git(root, "tag", "v9.9.10").returncode, 0)
+        self.assertEqual(run_control(root, "audit").returncode, 0, "the tag stands on returned keys")
+
+    def test_a_repair_never_hides_another_failure(self) -> None:
+        temporary, root = self.make_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_template_copy_decision(root, "TPL-D-901", str(base))
+        copy_id, slip = self.open_copy(root, base / "squelette-chantier-p1", "TPL-D-901")
+        self.make_clone_copy(root, base / "squelette-chantier-p1", slip)
+        self.assertEqual(run_git(root, "tag", "v9.9.9").returncode, 0)
+        (root / "docs/governance/broken.json").write_text("{ not json\n", encoding="utf-8")
+        self.commit_fixture(root, "fixture: another failure")
+        proofs = self.write_proofs(base, "proofs.json", [{"copy_id": copy_id}])
+        refused = self.run_copy(root, "return", "--proofs", str(proofs))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("audit refused the copy register mutation: JSON_SYNTAX", refused.stdout)
+
+    def test_status_says_so_in_a_copy_and_when_it_moved(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_copy_decision(root, "HD-120", str(base))
+        folder = base / "project-chantier-p1"
+        copy_id, slip = self.open_copy(root, folder, "HD-120")
+        self.make_clone_copy(root, folder, slip)
+        in_copy = run_control(folder, "status")
+        root = root.resolve()
+        self.assertTrue(in_copy.stdout.startswith(f"COPIE de {root} — ticket HD-120 — retour attendu le 2999-01-01"), in_copy.stdout)
+        original = run_control(root, "status")
+        self.assertNotIn("COPIE", original.stdout)
+        self.assertIn("Copies : 1 ouvertes (dont 0 en retard) · 0 à effacer · 0 conservées", original.stdout)
+        moved = base / "project-chantier-p1-2"
+        shutil.move(str(folder), str(moved))
+        after_move = run_control(moved, "status")
+        self.assertTrue(after_move.stdout.startswith(f"COPIE DÉPLACÉE de {root} — la fiche de sortie indique {folder}"), after_move.stdout)
+        view = json.loads(run_control(root, "roadmap-view", "--json").stdout)
+        banner = {row[0]: row[1] for row in view["verification"]["banner"]}
+        self.assertEqual(banner.get("Copies"), "1 ouvertes (dont 0 en retard) · 0 à effacer · 0 conservées")
+        self.assertIn("project_control/copies-state.v1.json", [entry["path"] for entry in view["verification"]["sources"]])
+
+    def test_the_register_is_committed_on_the_reference_branch_only(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_copy_decision(root, "HD-120", str(base))
+        self.open_copy(root, base / "project-chantier-p1", "HD-120")
+        self.assertEqual(run_control(root, "install-gate").returncode, 0)
+        self.assertEqual(run_git(root, "switch", "-q", "-c", "work/copies").returncode, 0)
+        register = root / "project_control/copies-state.v1.json"
+        register.write_text(register.read_text(encoding="utf-8").replace("2999-01-01", "2999-01-02"), encoding="utf-8")
+        self.assertEqual(run_git(root, "add", "project_control/copies-state.v1.json").returncode, 0)
+        gate = run_control(root, "pre-commit")
+        self.assertNotEqual(gate.returncode, 0)
+        self.assertIn("FAIL: WORK_BRANCH_RECORDS_READ_ONLY", gate.stdout)
+        refused_open = self.run_copy(root, "open", "--path", str(base / "project-chantier-p2"), "--kind", "CLONE",
+                                     "--usage", "chantier", "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE",
+                                     "--due", "2999-01-01")
+        self.assertNotEqual(refused_open.returncode, 0, "copy commands run from the canonical branch")
+        template_temporary, template = self.make_copy()
+        self.addCleanup(template_temporary.cleanup)
+        template_base = Path(template_temporary.name).resolve()
+        self.record_template_copy_decision(template, "TPL-D-901", str(template_base))
+        self.open_copy(template, template_base / "squelette-chantier-p1", "TPL-D-901")
+        self.assertEqual(run_git(template, "switch", "-q", "-c", "claude/essai").returncode, 0)
+        template_register = template / "provenance/copies-state.v1.json"
+        template_register.write_text(template_register.read_text(encoding="utf-8").replace("2999-01-01", "2999-01-02"), encoding="utf-8")
+        self.assertEqual(run_git(template, "add", "provenance/copies-state.v1.json").returncode, 0)
+        template_gate = run_control(template, "pre-commit")
+        self.assertNotEqual(template_gate.returncode, 0)
+        self.assertIn("FAIL: TEMPLATE_COPIES_ON_MAIN", template_gate.stdout)
+
+    def test_the_register_names_the_owners_paths_and_a_mounted_session_maps_them(self) -> None:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        declared_base = "/Users/owner/Projets"
+        mapping = {"PROJECT_CONTROL_PATH_MAP": f"{declared_base}={base}"}
+        self.record_copy_decision(root, "HD-120", declared_base)
+        copy_id, slip = self.open_copy(root, base / "project-chantier-p1", "HD-120", env=mapping,
+                                       declared=f"{declared_base}/project-chantier-p1")
+        self.assertEqual(slip["path"], f"{declared_base}/project-chantier-p1")
+        self.assertEqual(slip["original"], f"{declared_base}/{root.name}")
+        self.make_clone_copy(root, base / "project-chantier-p1", slip)
+        proofs = self.write_proofs(base, "proofs.json", [{"copy_id": copy_id}])
+        without = self.run_copy(root, "return", "--proofs", str(proofs))
+        self.assertNotEqual(without.returncode, 0, "without the map, the owner's path is not reachable from here")
+        returned = self.run_copy(root, "return", "--proofs", str(proofs), env=mapping)
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+        digest = self.copy_register(root)["copies"][0]["content_digest"]
+        checked = self.run_copy(root, "check", copy_id, "--path", f"{declared_base}/project-chantier-p1", "--digest", digest, env=mapping)
+        self.assertEqual(checked.returncode, 0, checked.stdout)
+
+    # --- The independent review of the construction (2026-09-28): each hole it found, closed. ---
+
+    def opened_clone_copy(self, name: str = "project-chantier-p1") -> tuple[tempfile.TemporaryDirectory, Path, Path, Path, str]:
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        folder = base / name
+        self.record_copy_decision(root, "HD-120", str(folder))
+        copy_id, slip = self.open_copy(root, folder, "HD-120")
+        self.make_clone_copy(root, folder, slip)
+        return temporary, root, base, folder, copy_id
+
+    def test_the_inventory_walks_the_folder_and_nothing_git_hides_escapes_it(self) -> None:
+        """Holes 1 and 9: an index flag, a trusted stat cache or a working tree declared elsewhere
+        hide changed files from Git — never from the inventory, which walks the folder and hashes
+        every file against what HEAD records."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        (folder / "etape.md").write_text("version mise dans l'index\n", encoding="utf-8")
+        self.assertEqual(run_git(folder, "add", "etape.md").returncode, 0)
+        (folder / "etape.md").write_text("version d'après, jamais indexée\n", encoding="utf-8")
+        for flag, name in (("--assume-unchanged", "README.md"), ("--skip-worktree", "FIRST_START.md")):
+            self.assertEqual(run_git(folder, "update-index", flag, name).returncode, 0)
+            (folder / name).write_text(f"travail unique, caché par {flag}\n", encoding="utf-8")
+        hidden = run_git(folder, "status", "--porcelain").stdout
+        self.assertNotIn("README.md", hidden, "Git itself no longer sees them")
+        self.assertNotIn("FIRST_START.md", hidden)
+        for key, value in (("core.trustctime", "false"), ("core.checkStat", "minimal")):
+            self.assertEqual(run_git(folder, "config", key, value).returncode, 0)
+        target = folder / "CLAUDE.md"
+        before = target.stat()
+        data = target.read_bytes()
+        changed = data.replace(b"CLAUDE", b"CLAUDX", 1)
+        self.assertNotEqual(changed, data)
+        with open(target, "r+b") as handle:  # in place: same size, and the same times put back
+            handle.write(changed)
+        os.utime(target, ns=(before.st_atime_ns, before.st_mtime_ns))
+        mirror = base / "mirror"
+        mirror.mkdir()
+        self.assertEqual(run_git(folder, "config", "core.worktree", str(mirror)).returncode, 0)
+        (folder / "travail-unique.md").write_text("né dans le dossier de la copie\n", encoding="utf-8")
+        (folder / ".DS_Store").write_bytes(b"\x00\x00\x00\x01Bud1 disposition des fenetres")
+        (folder / "docs/.DS_Store").write_bytes(b"\x00\x00\x00\x01Bud1")
+        items, refusals = self.control_module.clone_inventory(folder)
+        self.assertEqual(refusals, [])
+        self.assertNotIn("worktree:.DS_Store", items, "what the Finder writes when it shows a folder is never work")
+        self.assertNotIn("worktree:docs/.DS_Store", items)
+        for item in ("worktree:README.md", "worktree:FIRST_START.md", "worktree:CLAUDE.md", "worktree:travail-unique.md",
+                     "worktree:etape.md", "index:etape.md", "config:core.worktree"):
+            self.assertIn(item, items)
+        self.assertNotIn("config:core.trustctime", items, "a stat setting is technical")
+        self.assertNotIn("worktree:AGENTS.md", items, "a file identical to what HEAD records is not an item")
+        only_config = self.write_proofs(base, "config.json", [{"copy_id": copy_id, "abandon": [
+            {"item": "config:", "reason": "réglages locaux"}]}])
+        refused = self.run_copy(root, "return", "--proofs", str(only_config))
+        self.assertNotEqual(refused.returncode, 0)
+        for item in ("worktree:README.md", "worktree:FIRST_START.md", "worktree:CLAUDE.md", "worktree:travail-unique.md"):
+            self.assertIn(item, refused.stdout)
+
+    def test_an_embedded_repository_and_an_unresolved_conflict_are_refused(self) -> None:
+        """Hole 2: what a gitlink points to is another repository — the controller cannot return it,
+        so the copy is refused, never walked past; nor can it return half of a conflict."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        everything = self.write_proofs(base, "all.json", [{"copy_id": copy_id, "abandon": [
+            {"item": "worktree:", "reason": "tout"}, {"item": "index:", "reason": "tout"}]}])
+        blob = run_git(folder, "hash-object", "-w", "README.md").stdout.strip()
+        conflict = subprocess.run(["git", "update-index", "--index-info"], cwd=folder, check=False, capture_output=True,
+                                  text=True, input=f"100644 {blob} 1\tconflit.md\n100644 {blob} 2\tconflit.md\n")
+        self.assertEqual(conflict.returncode, 0, conflict.stderr)
+        refused = self.run_copy(root, "return", "--proofs", str(everything))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("conflit.md: an unresolved conflict in the index", refused.stdout)
+        self.assertEqual(run_git(folder, "update-index", "--force-remove", "conflit.md").returncode, 0)
+        helper = folder / "tools/helper"
+        helper.mkdir(parents=True)
+        self.assertEqual(run_git(helper, "init", "-q").returncode, 0)
+        (helper / "main.py").write_text("print('outil écrit dans la copie')\n", encoding="utf-8")
+        self.assertEqual(run_git(helper, "add", "main.py").returncode, 0)
+        nested = run_git(helper, "-c", "user.name=F", "-c", "user.email=f@example.invalid", "commit", "-q", "-m", "outil")
+        self.assertEqual(nested.returncode, 0, nested.stdout + nested.stderr)
+        self.assertEqual(run_git(folder, "add", "tools/helper").returncode, 0)
+        self.commit_in_copy(folder, "ajoute l'outil")
+        refused = self.run_copy(root, "return", "--proofs", str(everything))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("tools/helper: a submodule or embedded repository committed as a gitlink", refused.stdout)
+
+    def test_reading_a_copy_runs_no_command_its_configuration_names(self) -> None:
+        """Git runs `core.fsmonitor` as soon as it reads an index: the controller reads a copy with
+        it switched off. The key is an item, like a diff driver; a plain setting is not."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        marker = base / "fsmonitor-a-tourne"
+        for key, value in (("core.fsmonitor", f"touch {marker}"), ("diff.secret.textconv", "cat"),
+                           ("merge.conflictstyle", "diff3")):
+            self.assertEqual(run_git(folder, "config", key, value).returncode, 0)
+        items, refusals = self.control_module.clone_inventory(folder)
+        self.assertFalse(marker.exists(), "no command of the copy ran")
+        self.assertEqual(refusals, [])
+        self.assertIn("config:core.fsmonitor", items)
+        self.assertIn("config:diff.secret.textconv", items)
+        self.assertNotIn("config:merge.conflictstyle", items)
+
+    def test_only_the_branches_and_tags_of_the_original_keep_what_a_copy_held(self) -> None:
+        """Hole 3: a remote-tracking reference or a reflog keeps nothing for long — only a branch or
+        a tag of the original counts, and it is counted again right before the erasure."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        (folder / "travail.md").write_text("travail unique de la copie\n", encoding="utf-8")
+        self.assertEqual(run_git(folder, "add", "travail.md").returncode, 0)
+        work = self.commit_in_copy(folder, "travail")
+        empty = self.write_proofs(base, "empty.json", [{"copy_id": copy_id}])
+        for step in (("fetch", "-q", str(folder), "main:refs/remotes/copie/main"),
+                     ("fetch", "-q", str(folder), "main:refs/heads/relecture"),
+                     ("switch", "-q", "relecture"), ("switch", "-q", "main"), ("branch", "-q", "-D", "relecture")):
+            done = run_git(root, *step)
+            self.assertEqual(done.returncode, 0, f"{step}: {done.stderr}")
+        self.assertEqual(run_git(root, "cat-file", "-e", work).returncode, 0, "the original still holds the commit, for now")
+        refused = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertNotEqual(refused.returncode, 0, "held only by a remote-tracking reference and a reflog: " + refused.stdout)
+        self.assertIn("ref:refs/heads/main", refused.stdout)
+        self.assertEqual(run_git(root, "fetch", "-q", str(folder), "main:refs/heads/retour-p1").returncode, 0)
+        returned = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+        entry = self.copy_register(root)["copies"][0]
+        self.assertRegex(entry["returns"][-1]["original_head"], r"^[a-f0-9]{40}$")
+        checked = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", entry["content_digest"])
+        self.assertEqual(checked.returncode, 0, checked.stdout)
+        for passed in ("COPY_ORIGINAL", "COPY_CONTENT", "COPY_COVERAGE", "COPY_FRONTIER", "COPY_IDENTITY"):
+            self.assertIn(f"PASS: {passed}", checked.stdout)
+        self.assertEqual(run_git(root, "branch", "-q", "-D", "retour-p1").returncode, 0)
+        dropped = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", entry["content_digest"])
+        self.assertNotEqual(dropped.returncode, 0)
+        self.assertIn("FAIL: COPY_COVERAGE", dropped.stdout)
+        self.assertIn("ref:refs/heads/main", dropped.stdout)
+
+    def test_a_file_proof_holds_while_the_original_keeps_the_commit_it_was_proven_on(self) -> None:
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        (folder / "notes.md").write_text("une note née dans la copie\n", encoding="utf-8")
+        before = run_git(root, "rev-parse", "HEAD").stdout.strip()
+        (root / "reports/copies").mkdir(parents=True, exist_ok=True)
+        (root / "reports/copies/notes.md").write_bytes((folder / "notes.md").read_bytes())
+        proven_on = self.commit_fixture(root, "chore: the note comes back")
+        proofs = self.write_proofs(base, "proofs.json", [{"copy_id": copy_id, "files": [
+            {"item": "worktree:notes.md", "path": "reports/copies/notes.md", "role": "note"}]}])
+        returned = self.run_copy(root, "return", "--proofs", str(proofs))
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+        entry = self.copy_register(root)["copies"][0]
+        self.assertEqual(entry["returns"][-1]["original_head"], proven_on)
+        checked = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", entry["content_digest"])
+        self.assertEqual(checked.returncode, 0, checked.stdout)
+        # History rewritten: the register's commit replayed without the one that brought the note back.
+        rebased = run_git(root, "-c", "user.name=F", "-c", "user.email=f@example.invalid",
+                          "rebase", "-q", "--onto", before, proven_on, "main")
+        self.assertEqual(rebased.returncode, 0, rebased.stdout + rebased.stderr)
+        self.assertEqual(self.copy_register(root)["copies"][0]["state"], "RETURNED", "the register still says so")
+        dropped = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", entry["content_digest"])
+        self.assertNotEqual(dropped.returncode, 0)
+        self.assertIn("FAIL: COPY_COVERAGE", dropped.stdout)
+        self.assertIn("no longer on a branch or a tag of the original", dropped.stdout)
+
+    def test_copy_commands_run_in_the_original_and_nowhere_else(self) -> None:
+        """Hole 4: a copy — or any clone — carries the register as it was when it was made. Run
+        from there, a check would judge a stale page against another repository."""
+        temporary, root, folder, copy_id = self.returned_clone()
+        base = folder.parent
+        digest = self.copy_register(root)["copies"][0]["content_digest"]
+        proofs = self.write_proofs(base, "p.json", [{"copy_id": copy_id}])
+        attempts = {
+            "check": ("check", copy_id, "--path", str(folder), "--digest", digest),
+            "cleanup": ("cleanup", "--output", str(base / "depuis-la-copie.sh")),
+            "open": ("open", "--path", str(base / "project-chantier-p2"), "--kind", "CLONE", "--usage", "chantier",
+                     "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE", "--due", "2999-01-01"),
+            "return": ("return", "--proofs", str(proofs)),
+            "move": ("move", copy_id, "--path", str(base / "project-chantier-p1-2")),
+            "close": ("close", copy_id, "--state", "ERASED"),
+        }
+        for label, arguments in attempts.items():
+            refused = self.run_copy(folder, *arguments)
+            self.assertNotEqual(refused.returncode, 0, label)
+            self.assertIn("this repository is a copy", refused.stdout, label)
+        self.assertFalse((base / "depuis-la-copie.sh").exists())
+        in_copy = run_control(folder, "audit")
+        self.assertIn("PASS: COPIES_RETURNED — this repository is a copy: the copies are judged in the original", in_copy.stdout)
+        self.record_copy_decision(root, "HD-121", str(folder))
+        stray = base / "project-chantier-p9"
+        self.make_clone_copy(root, stray, None)
+        from_stray = self.run_copy(stray, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertNotEqual(from_stray.returncode, 0)
+        self.assertIn("FAIL: COPY_ORIGINAL", from_stray.stdout)
+        script = base / "depuis-un-clone.sh"
+        refused = self.run_copy(stray, "cleanup", "--output", str(script))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("registered by the original at", refused.stdout)
+        self.assertFalse(script.exists())
+        # Second review (Codex, R05): a clone without an exit slip inherits the register too — it
+        # records nothing in it, or it would claim a closure the original never made.
+        stray_head = run_git(stray, "rev-parse", "HEAD").stdout.strip()
+        mutations = {
+            "open": ("open", "--path", str(base / "project-chantier-p3"), "--kind", "CLONE", "--usage", "chantier",
+                     "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE", "--due", "2999-01-01"),
+            "return": ("return", "--proofs", str(proofs)),
+            "move": ("move", copy_id, "--path", str(base / "project-chantier-p1-3")),
+            "close": ("close", copy_id, "--state", "KEPT", "--decision", "HD-121"),
+        }
+        for label, arguments in mutations.items():
+            refused = self.run_copy(stray, *arguments)
+            self.assertNotEqual(refused.returncode, 0, f"{label}: {refused.stdout}")
+            self.assertIn("inherited from the original at", refused.stdout, label)
+        self.assertEqual(run_git(stray, "rev-parse", "HEAD").stdout.strip(), stray_head, "nothing recorded in the clone")
+        self.assertEqual(self.copy_register(stray)["copies"][0]["state"], "RETURNED")
+        spelled = self.run_copy(root, "check", copy_id, "--path", str(folder) + "/", "--digest", digest)
+        self.assertNotEqual(spelled.returncode, 0, "a path is written one way only")
+        self.assertIn("FAIL: COPY_BINDING", spelled.stdout)
+        self.assertEqual(self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest).returncode, 0)
+
+    def test_the_erasure_script_runs_without_a_path_map_and_carries_no_name(self) -> None:
+        """Holes 5 and 6: the script runs on the owner's machine, where the register's paths are
+        real — never through a map that would check one folder and erase another; and nothing the
+        register holds can end a line of it."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        declared_base = base / "vue-proprietaire"
+        declared_base.mkdir()
+        (declared_base / root.name).symlink_to(root, target_is_directory=True)
+        foreign = declared_base / "project-chantier-p1"
+        foreign.mkdir()
+        (foreign / "precieux.md").write_text("un dossier qui n'est pas la copie\n", encoding="utf-8")
+        mapping = {"PROJECT_CONTROL_PATH_MAP": f"{declared_base}={base}"}
+        self.record_copy_decision(root, "HD-120", str(declared_base))
+        copy_id, slip = self.open_copy(root, base / "project-chantier-p1", "HD-120", env=mapping,
+                                       declared=f"{declared_base}/project-chantier-p1")
+        self.make_clone_copy(root, base / "project-chantier-p1", slip)
+        proofs = self.write_proofs(base, "proofs.json", [{"copy_id": copy_id}])
+        self.assertEqual(self.run_copy(root, "return", "--proofs", str(proofs), env=mapping).returncode, 0)
+        script = base / "effacer.sh"
+        written = self.run_copy(root, "cleanup", "--output", str(script), env=mapping)
+        self.assertEqual(written.returncode, 0, written.stdout + written.stderr)
+        text = script.read_text(encoding="utf-8")
+        self.assertIn("unset PROJECT_CONTROL_PATH_MAP", text)
+        self.assertNotIn("project-chantier-p1 (", text, "the comment names the copy by its identifier only")
+        ran = subprocess.run(["bash", str(script)], capture_output=True, text=True, check=False, env=dict(os.environ, **mapping))
+        self.assertNotEqual(ran.returncode, 0, ran.stdout)
+        self.assertTrue((foreign / "precieux.md").exists(), "the folder at the owner's path was never the copy")
+        self.assertTrue((base / "project-chantier-p1").is_dir(), "the copy stays until it is checked where it is erased")
+        doubled = self.run_copy(root, "open", "--path", "/" + str(base / "project-chantier-p2"), "--kind", "CLONE",
+                                "--usage", "chantier", "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE",
+                                "--due", "2999-01-01", env=mapping)
+        self.assertNotEqual(doubled.returncode, 0)
+        self.assertIn("absolute and normalized", doubled.stdout)
+        unmapped = self.run_copy(root, "open", "--path", str(base / "project-chantier-p2"), "--kind", "CLONE",
+                                 "--usage", "chantier", "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE",
+                                 "--due", "2999-01-01")
+        self.assertNotEqual(unmapped.returncode, 0, "without its map, the session is not the original that registered")
+        self.assertIn("inherited from the original at", unmapped.stdout)
+        # A register edited by hand, with a line break in a path, never reaches a script.
+        edited_temporary, edited_root, edited_folder, _ = self.returned_clone()
+        register_path = edited_root / "project_control/copies-state.v1.json"
+        state = json.loads(register_path.read_text(encoding="utf-8"))
+        state["copies"][0]["path"] = str(edited_folder.parent) + "/x\ntouch PWNED #"
+        state["copies"][0]["name"] = "x\ntouch PWNED #"
+        register_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        self.commit_fixture(edited_root, "chore: a register edited by hand")
+        audit = run_control(edited_root, "audit")
+        self.assertNotEqual(audit.returncode, 0)
+        self.assertIn("a path holds no control character", audit.stdout)
+        edited_script = edited_folder.parent / "effacer.sh"
+        refused = self.run_copy(edited_root, "cleanup", "--output", str(edited_script))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertFalse(edited_script.exists())
+        self.assertFalse((edited_root / "PWNED").exists())
+
+    def test_a_copy_holding_what_an_erasure_cannot_answer_for_is_refused(self) -> None:
+        """Holes 7 and 8: a mount point (an erasure would cross it), a pipe (a check would hang on
+        it), another registered copy inside this one (its own return is still due elsewhere)."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        os.mkfifo(folder / "tube")
+        inner = folder / "sous-copie"
+        inner.mkdir()
+        (inner / "copie.json").write_text(json.dumps(
+            {"copy_id": "COPY-009", "token": "ab" * 16, "original": "/ailleurs/projet"}) + "\n", encoding="utf-8")
+        mounted = folder / "point-de-montage"
+        mounted.mkdir()
+        (mounted / "fichier.md").write_text("sur un autre volume\n", encoding="utf-8")
+        real_lstat = os.lstat
+
+        def lstat(path, *args, **kwargs):  # a mount point: another device under the same folder
+            result = real_lstat(path, *args, **kwargs)
+            if os.fspath(path) == os.fspath(mounted):
+                values = list(result)
+                values[2] = result.st_dev + 1
+                return os.stat_result(values)
+            return result
+
+        with unittest.mock.patch.object(self.control_module.os, "lstat", lstat):
+            items, refusals = self.control_module.clone_inventory(folder)
+        joined = "\n".join(refusals)
+        self.assertIn("tube: a special file", joined)
+        self.assertIn("sous-copie/copie.json: another registered copy lives inside this one (COPY-009 of /ailleurs/projet)", joined)
+        self.assertIn("point-de-montage: a mount point inside the copy", joined)
+        self.assertNotIn("worktree:point-de-montage/fichier.md", items, "never walked into")
+        everything = self.write_proofs(base, "all.json", [{"copy_id": copy_id, "abandon": [{"item": "worktree:", "reason": "tout"}]}])
+        refused = self.run_copy(root, "return", "--proofs", str(everything))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("tube: a special file", refused.stdout)
+
+    def test_the_check_looks_at_the_place_before_the_walk_and_again_after_it(self) -> None:
+        """Hole 10: the place — the path and the slip found there — is judged once before the walk, so
+        that a folder that is not the copy is never walked, and again after it, as close to the
+        erasure as the check can be: a folder swapped in meanwhile is refused."""
+        temporary, root, folder, copy_id = self.returned_clone()
+        digest = self.copy_register(root)["copies"][0]["content_digest"]
+        with unittest.mock.patch.dict(os.environ):
+            os.environ.pop("PROJECT_CONTROL_PATH_MAP", None)
+            control = self.control_module.ProjectControl(root)
+            walked = control.copy_inventory
+
+            def swap(entry, declared=None):
+                result = walked(entry, declared)
+                shutil.move(str(folder), str(folder.parent / "mise-de-cote"))
+                folder.mkdir()
+                (folder / "precieux.md").write_text("un autre dossier venu à la place\n", encoding="utf-8")
+                return result
+
+            control.copy_inventory = swap
+            statuses = {finding.check: finding.status for finding in control.check_copy(copy_id, str(folder), digest)}
+            self.assertEqual(statuses.get("COPY_CONTENT"), "PASS")
+            self.assertEqual(statuses.get("COPY_COVERAGE"), "PASS")
+            self.assertEqual(statuses.get("COPY_IDENTITY"), "FAIL", statuses)
+            walks: list[str] = []
+            second = self.control_module.ProjectControl(root)
+            second.copy_inventory = lambda entry, declared=None: walks.append(entry["copy_id"]) or ({}, [])
+            statuses = {finding.check: finding.status for finding in second.check_copy(copy_id, str(folder), digest)}
+            self.assertEqual(statuses.get("COPY_IDENTITY"), "FAIL")
+            self.assertEqual(walks, [], "a folder that is not the copy is never walked")
+
+    # --- The review of the code by the second AI (Codex, 2026-09-28): R01 to R06, closed. ---
+
+    def test_a_commit_only_the_old_side_of_a_reflog_entry_reaches_is_still_inventoried(self) -> None:
+        """R01: Git keeps two commits per reflog entry — where the reference was, and where it went.
+        A commit only the former still reaches is recoverable work: an item, never filtered out."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        before = run_git(folder, "rev-parse", "HEAD").stdout.strip()
+        (folder / "unique.txt").write_text("travail que seul le côté ancien d'un reflog atteint\n", encoding="utf-8")
+        self.assertEqual(run_git(folder, "add", "unique.txt").returncode, 0)
+        unique = self.commit_in_copy(folder, "travail unique")
+        self.assertEqual(run_git(folder, "reset", "-q", "--mixed", before).returncode, 0)
+        (folder / "unique.txt").unlink()
+        for reference in ("HEAD", "refs/heads/main"):
+            count = len(run_git(folder, "reflog", "show", reference, "--format=%H").stdout.split())
+            for index in range(count - 1, 0, -1):  # keep only the entry of the reset, whose old side is the work
+                self.assertEqual(run_git(folder, "reflog", "delete", f"{reference}@{{{index}}}").returncode, 0)
+        self.assertIn(unique, run_git(folder, "rev-list", "--reflog", "--not", "--all").stdout, "Git still reaches it")
+        items, refusals = self.control_module.clone_inventory(folder)
+        self.assertEqual(refusals, [])
+        self.assertIn(f"reflog:{unique}", items)
+        empty = self.write_proofs(base, "empty.json", [{"copy_id": copy_id}])
+        refused = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn(f"reflog:{unique}", refused.stdout)
+        abandoned = self.write_proofs(base, "abandon.json", [{"copy_id": copy_id, "abandon": [
+            {"item": "reflog:", "reason": "travail d'essai retiré à dessein"}]}])
+        returned = self.run_copy(root, "return", "--proofs", str(abandoned))
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+
+    def test_an_export_is_kept_only_while_the_original_keeps_the_revision_it_came_from(self) -> None:
+        """R02: an intact export holds the files of its revision — they are safe only while the
+        original keeps that revision on a branch or a tag, at the return and before the erasure."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.assertEqual(run_git(root, "switch", "-q", "-c", "export-data").returncode, 0)
+        (root / "reports/unique-export.txt").write_text("contenu que seule cette branche porte\n", encoding="utf-8")
+        origin = self.commit_fixture(root, "fixture: contenu à exporter")
+        self.assertEqual(run_git(root, "switch", "-q", "main").returncode, 0)
+        folder = base / "project-chantier-p1"
+        self.record_copy_decision(root, "HD-120", str(folder))
+        copy_id, slip = self.open_copy(root, folder, "HD-120", kind="EXPORT", origin=origin)
+        (folder / "source").mkdir(parents=True)
+        archive = subprocess.run(["git", "archive", origin], cwd=root, capture_output=True, check=True)
+        subprocess.run(["tar", "-x", "-C", str(folder / "source")], input=archive.stdout, check=True)
+        (folder / "copie.json").write_text(json.dumps(slip) + "\n", encoding="utf-8")
+        empty = self.write_proofs(base, "empty.json", [{"copy_id": copy_id}])
+        returned = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+        digest = self.copy_register(root)["copies"][0]["content_digest"]
+        checked = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertEqual(checked.returncode, 0, checked.stdout)
+        self.assertEqual(run_git(root, "branch", "-q", "-D", "export-data").returncode, 0)
+        self.assertEqual(run_git(root, "cat-file", "-e", origin).returncode, 0, "the object is still there, for now")
+        dropped = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertNotEqual(dropped.returncode, 0)
+        self.assertIn("FAIL: COPY_COVERAGE", dropped.stdout)
+        self.assertIn(f"origin:{origin}", dropped.stdout)
+        again = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertNotEqual(again.returncode, 0, "a new return does not pretend the revision is kept")
+        self.assertIn(f"origin:{origin}", again.stdout)
+        let_go = self.write_proofs(base, "let-go.json", [{"copy_id": copy_id, "abandon": [
+            {"item": "origin:", "reason": "révision d'essai abandonnée à dessein"}]}])
+        self.assertEqual(self.run_copy(root, "return", "--proofs", str(let_go)).returncode, 0)
+
+    def test_the_content_digest_tells_every_inventory_apart(self) -> None:
+        """R03: a link may point to a text holding a tab and a line break. Two different inventories
+        never share a digest, so a file added in a folder abandoned whole still changes it."""
+        digest = self.control_module.inventory_digest
+        seal = "0" * 64
+        self.assertNotEqual(digest({"worktree:a": "symlink:cible\nworktree:secret.txt\t" + seal}),
+                            digest({"worktree:a": "symlink:cible", "worktree:secret.txt": seal}))
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        content = b"travail ajoute apres le retour\n"
+        link = folder / "a"
+        link.symlink_to("cible-inexistante\nworktree:secret.txt\t" + hashlib.sha256(content).hexdigest())
+        proofs = self.write_proofs(base, "whole.json", [{"copy_id": copy_id, "abandon": [
+            {"item": "worktree:", "reason": "arbre abandonné en bloc"}]}])
+        self.assertEqual(self.run_copy(root, "return", "--proofs", str(proofs)).returncode, 0)
+        recorded = self.copy_register(root)["copies"][0]["content_digest"]
+        link.unlink()
+        link.symlink_to("cible-inexistante")
+        (folder / "secret.txt").write_bytes(content)
+        checked = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", recorded)
+        self.assertNotEqual(checked.returncode, 0)
+        self.assertIn("FAIL: COPY_CONTENT", checked.stdout)
+
+    def test_reading_a_partial_clone_fetches_nothing_and_runs_nothing(self) -> None:
+        """R04: a partial clone fetches a missing object from its remote, through the transport its
+        configuration names. The controller refuses it before reading anything."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        marker = base / "commande-de-la-copie.txt"
+        transport = base / "faux-ssh.sh"
+        transport.write_text(f"#!/bin/sh\necho lancee >> '{marker}'\nexit 1\n", encoding="utf-8")
+        transport.chmod(0o700)
+        tree = run_git(folder, "rev-parse", "HEAD^{tree}").stdout.strip()
+        for key, value in (("extensions.partialClone", "origin"), ("remote.origin.promisor", "true"),
+                           ("remote.origin.url", "ssh://example.invalid/fiction"), ("core.sshCommand", str(transport))):
+            self.assertEqual(run_git(folder, "config", key, value).returncode, 0)
+        loose = folder / ".git/objects" / tree[:2] / tree[2:]
+        self.assertTrue(loose.is_file())
+        loose.unlink()
+        items, refusals = self.control_module.clone_inventory(folder)
+        self.assertFalse(marker.exists(), "no command of the copy ran")
+        self.assertTrue(any("partial clone" in refusal for refusal in refusals), refusals)
+        empty = self.write_proofs(base, "empty.json", [{"copy_id": copy_id}])
+        refused = self.run_copy(root, "return", "--proofs", str(empty))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("partial clone", refused.stdout)
+        self.assertFalse(marker.exists())
+
+    def test_reading_a_copy_verifies_no_signature_with_a_program_it_names(self) -> None:
+        """Found while closing R01: `git reflog show` is a log command — with `log.showSignature`
+        set, it verifies each signed commit with the program the copy's configuration names. The
+        controller reads reflogs with a plumbing command, which verifies nothing."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        marker = base / "programme-de-signature.txt"
+        program = base / "faux-gpg.sh"
+        program.write_text(f"#!/bin/sh\necho lance >> '{marker}'\nexit 1\n", encoding="utf-8")
+        program.chmod(0o700)
+        tree = run_git(folder, "rev-parse", "HEAD^{tree}").stdout.strip()
+        parent = run_git(folder, "rev-parse", "HEAD").stdout.strip()
+        signed = (f"tree {tree}\nparent {parent}\nauthor F <f@example.invalid> 1700000000 +0000\n"
+                  "committer F <f@example.invalid> 1700000000 +0000\n"
+                  "gpgsig -----BEGIN PGP SIGNATURE-----\n \n AAAA\n -----END PGP SIGNATURE-----\n\nsigne\n")
+        written = subprocess.run(["git", "hash-object", "-t", "commit", "-w", "--stdin"], cwd=folder, input=signed,
+                                 capture_output=True, text=True, check=False)
+        self.assertEqual(written.returncode, 0, written.stderr)
+        self.assertEqual(run_git(folder, "update-ref", "-m", "signé", "refs/heads/main", written.stdout.strip()).returncode, 0)
+        for key, value in (("log.showSignature", "true"), ("gpg.program", str(program))):
+            self.assertEqual(run_git(folder, "config", key, value).returncode, 0)
+        items, refusals = self.control_module.clone_inventory(folder)
+        self.assertEqual(refusals, [])
+        self.assertFalse(marker.exists(), "no program of the copy verified anything")
+        self.assertIn("config:gpg.program", items)
+
+    def test_a_copy_hidden_inside_git_is_refused_wherever_it_hides(self) -> None:
+        """R06: another registered copy, or any repository, inside `.git` — among the hooks or in
+        the folders Git keeps for itself — would go with the erasure: it is refused, even when the
+        folder that holds it is abandoned whole."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        second_temporary, second = self.make_normal_copy()
+        self.addCleanup(second_temporary.cleanup)
+        nested = folder / ".git/hooks/project-chantier-p2"
+        self.record_copy_decision(second, "HD-120", str(nested))
+        nested_id, nested_slip = self.open_copy(second, nested, "HD-120")
+        self.make_clone_copy(second, nested, nested_slip)
+        (nested / "unique.txt").write_text("travail d'une copie encore ouverte ailleurs\n", encoding="utf-8")
+        stowed = folder / ".git/objects/zz-rangement/depot"
+        stowed.mkdir(parents=True)
+        self.assertEqual(run_git(stowed, "init", "-q").returncode, 0)
+        (stowed / "notes.md").write_text("un dépôt rangé chez Git\n", encoding="utf-8")
+        items, refusals = self.control_module.clone_inventory(folder)
+        joined = "\n".join(refusals)
+        self.assertIn(f"hooks/project-chantier-p2/.git/copie.json: another registered copy lives inside this one ({nested_id}", joined)
+        self.assertIn("objects/zz-rangement/depot/.git: a repository inside .git", joined)
+        whole = self.write_proofs(base, "whole.json", [{"copy_id": copy_id, "abandon": [
+            {"item": "git:", "reason": "réglages locaux"}]}])
+        refused = self.run_copy(root, "return", "--proofs", str(whole))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("another registered copy lives inside this one", refused.stdout)
+
+    def test_a_pipe_named_like_an_exit_slip_is_never_opened(self) -> None:
+        """Short review (Codex, N01): an exit slip is read only when it is a regular file. A pipe
+        named `copie.json` — among the hooks, in a folder Git keeps for itself, or in place of the
+        copy's own slip — is refused at once: opening it would hold the check until a writer came."""
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        proofs = self.write_proofs(base, "empty.json", [{"copy_id": copy_id}])
+        returned = self.run_copy(root, "return", "--proofs", str(proofs))
+        self.assertEqual(returned.returncode, 0, returned.stdout + returned.stderr)
+        digest = self.copy_register(root)["copies"][0]["content_digest"]
+        environment = {key: value for key, value in os.environ.items() if key != "PROJECT_CONTROL_PATH_MAP"}
+
+        def check(label: str) -> subprocess.CompletedProcess[str]:
+            try:
+                return subprocess.run(
+                    [sys.executable, "-B", "scripts/project_control.py", "copy", "check", copy_id, "--path", str(folder),
+                     "--digest", digest], cwd=root, capture_output=True, text=True, check=False, env=environment, timeout=60)
+            except subprocess.TimeoutExpired:
+                self.fail(f"{label}: the check waited on a pipe")
+
+        for place in (folder / ".git/hooks/copie.json", folder / ".git/objects/rangement/copie.json"):
+            place.parent.mkdir(parents=True, exist_ok=True)
+            os.mkfifo(place)
+            refused = check(str(place.relative_to(folder)))
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("a special file (pipe, socket or device)", refused.stdout)
+            place.unlink()
+        slip = folder / ".git/copie.json"
+        kept = slip.read_bytes()
+        slip.unlink()
+        os.mkfifo(slip)
+        refused = check("the copy's own slip")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("FAIL: COPY_IDENTITY", refused.stdout)
+        in_copy = subprocess.run([sys.executable, "-B", "scripts/project_control.py", "status"], cwd=folder,
+                                 capture_output=True, text=True, check=False, env=environment, timeout=60)
+        self.assertNotIn("Traceback", in_copy.stderr)
+        slip.unlink()
+        slip.write_bytes(kept)
+        self.assertEqual(check("restored").returncode, 0)
+        self.assertIsNone(self.control_module.read_copy_slip(folder / "absent.json"))
+        # A pipe in place of a file Git itself opens (HEAD) is never handed to Git.
+        head = folder / ".git/HEAD"
+        kept_head = head.read_bytes()
+        head.unlink()
+        os.mkfifo(head)
+        refused = check(".git/HEAD")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn(".git/HEAD: a special file (pipe, socket or device)", refused.stdout)
+        head.unlink()
+        head.write_bytes(kept_head)
+        self.assertEqual(check("HEAD restored").returncode, 0)
+        # A configuration that includes a pipe outside the copy: Git would wait on it. Every reading
+        # of a copy is bounded in time, and the copy refused.
+        included = base / "inclus.cfg"
+        os.mkfifo(included)
+        with (folder / ".git/config").open("a", encoding="utf-8") as handle:
+            handle.write(f"[include]\n\tpath = {included}\n")
+        with unittest.mock.patch.object(self.control_module, "COPY_GIT_TIMEOUT_SECONDS", 2):
+            started = time.monotonic()
+            with self.assertRaisesRegex(self.control_module.ProjectControlError, "did not answer"):
+                self.control_module.clone_inventory(folder)
+            self.assertLess(time.monotonic() - started, 30)
+        included.unlink()
+
+    def test_a_padded_or_damaged_exit_slip_hides_no_copy(self) -> None:
+        """N01 control (Codex, N02): a slip is read only when small, but a file that bears its name
+        and is too large to be read — the same slip, padded — or that looks like a slip without
+        reading as one, is refused all the same: it must not hide the copy it belongs to."""
+        seal = self.control_module.nested_slip_refusal
+        temporary, root, base, folder, copy_id = self.opened_clone_copy()
+        registered = json.dumps({"copy_id": "COPY-009", "token": "ab" * 16, "original": "/ailleurs/projet"})
+        probe = base / "sonde"
+        probe.mkdir()
+        cases = {
+            "65 536 octets, lisible": (registered + " " * (65536 - len(registered))).encode("utf-8"),
+            "65 537 octets, trop grande": (registered + " " * (65537 - len(registered))).encode("utf-8"),
+            "abîmée": (registered + "\nfin illisible").encode("utf-8"),
+            "précédée d'une marque d'octets": ("\ufeff" + registered).encode("utf-8"),
+            "écrite dans un autre encodage": registered.encode("utf-16"),
+            "à laquelle il manque l'original": json.dumps({"copy_id": "COPY-009", "token": "ab" * 16}).encode("utf-8"),
+        }
+        for label, content in cases.items():
+            (probe / "copie.json").write_bytes(content)
+            self.assertIsNotNone(seal("sonde/copie.json", probe / "copie.json"), label)
+        for label, content in (("un objet du projet", {"titre": "une donnée du projet"}), ("une liste", [1, 2, 3])):
+            (probe / "copie.json").write_text(json.dumps(content), encoding="utf-8")
+            self.assertIsNone(seal("sonde/copie.json", probe / "copie.json"), f"{label} of that name is not a slip")
+        # In the working tree: a nested copy whose slip is padded is refused at the return.
+        second_temporary, second = self.make_normal_copy()
+        self.addCleanup(second_temporary.cleanup)
+        inside = folder / "project-chantier-p2"
+        self.record_copy_decision(second, "HD-120", str(inside))
+        inside_id, inside_slip = self.open_copy(second, inside, "HD-120", kind="EXPORT",
+                                                origin=run_git(second, "rev-parse", "HEAD").stdout.strip())
+        inside.mkdir()
+        padded = json.dumps(inside_slip)
+        (inside / "copie.json").write_text(padded + " " * (65537 - len(padded)), encoding="utf-8")
+        (inside / "travail_unique.txt").write_text("travail non rendu d'une copie ouverte ailleurs\n", encoding="utf-8")
+        whole = self.write_proofs(base, "whole.json", [{"copy_id": copy_id, "abandon": [
+            {"item": "worktree:", "reason": "arbre abandonné en bloc"}]}])
+        refused = self.run_copy(root, "return", "--proofs", str(whole))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("project-chantier-p2/copie.json: a file named copie.json too large to be checked", refused.stdout)
+        shutil.rmtree(inside)
+        # In Git's own folder, after a return: the check that precedes the erasure refuses.
+        empty = self.write_proofs(base, "empty.json", [{"copy_id": copy_id}])
+        self.assertEqual(self.run_copy(root, "return", "--proofs", str(empty)).returncode, 0)
+        digest = self.copy_register(root)["copies"][0]["content_digest"]
+        hidden = folder / ".git/objects/review-fixture/project-chantier-p2"
+        hidden.mkdir(parents=True)
+        (hidden / "copie.json").write_text(padded + " " * (65537 - len(padded)), encoding="utf-8")
+        (hidden / "travail_unique.txt").write_text("travail non rendu\n", encoding="utf-8")
+        checked = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertNotEqual(checked.returncode, 0)
+        self.assertIn("FAIL: COPY_CONTENT", checked.stdout)
+        self.assertIn(".git/objects/review-fixture/project-chantier-p2/copie.json", checked.stdout)
+        (hidden / "copie.json").write_text("{}", encoding="utf-8")
+        emptied = self.run_copy(root, "check", copy_id, "--path", str(folder), "--digest", digest)
+        self.assertNotEqual(emptied.returncode, 0, "no file of that name has its place inside .git")
+        self.assertIn("a file named copie.json inside .git", emptied.stdout)
+
+    def test_an_original_named_source_is_not_taken_for_an_export_by_a_neighbour_file(self) -> None:
+        """N02 control (Codex, N03): a repository named `source` whose parent holds a `copie.json`
+        is the `source/` of an export only when that file may be an exit slip — a small JSON that is
+        plainly something else leaves the original an original; a slip, or a file that may be one,
+        still makes it a copy."""
+        temporary, project = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        root = base / "source"
+        project.rename(root)
+        self.record_copy_decision(root, "HD-120", str(base))
+        self.open_copy(root, base / "project-chantier-p1", "HD-120")
+        neighbour = base / "copie.json"
+        neighbour.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+        second = self.run_copy(root, "open", "--path", str(base / "project-chantier-p2"), "--kind", "CLONE",
+                               "--usage", "chantier", "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE",
+                               "--due", "2999-01-01")
+        self.assertEqual(second.returncode, 0, "a list next to it does not make the original a copy: " + second.stdout)
+        self.assertEqual(json.loads(neighbour.read_text(encoding="utf-8")), [1, 2, 3])
+        slip = {"copy_id": "COPY-009", "token": "ab" * 16, "original": "/ailleurs/projet", "path": str(base)}
+        for label, content in (("a slip", json.dumps(slip)), ("a slip padded", json.dumps(slip) + " " * 70000),
+                               ("a slip damaged", json.dumps(slip) + "\nfin")):
+            neighbour.write_text(content, encoding="utf-8")
+            third = self.run_copy(root, "open", "--path", str(base / "project-chantier-p3"), "--kind", "CLONE",
+                                  "--usage", "chantier", "--ticket", "HD-120", "--closes-with", "9.9.9", "--fate", "ERASE",
+                                  "--due", "2999-01-01")
+            self.assertNotEqual(third.returncode, 0, label)
+            self.assertIn("this repository is a copy", third.stdout, label)
+        self.assertEqual(len(self.copy_register(root)["copies"]), 2)
+
+    def test_the_script_erases_from_the_parent_folder_it_pinned(self) -> None:
+        """A check that passed an instant ago does not make a path safe: the script moves into the
+        copy's parent, checks that it is physically the folder the check looked at, and erases the
+        copy by its name from there — a link slipped in higher up diverts nothing."""
+        temporary, root = self.make_normal_copy()
+        self.addCleanup(temporary.cleanup)
+        base = Path(temporary.name).resolve()
+        self.record_copy_decision(root, "HD-120", str(base))
+        volume = base / "volume"
+        volume.mkdir()
+        folder = volume / "project-chantier-p1"
+        copy_id, slip = self.open_copy(root, folder, "HD-120")
+        self.make_clone_copy(root, folder, slip)
+        proofs = self.write_proofs(base, "proofs.json", [{"copy_id": copy_id}])
+        self.assertEqual(self.run_copy(root, "return", "--proofs", str(proofs)).returncode, 0)
+        script = base / "effacer.sh"
+        self.assertEqual(self.run_copy(root, "cleanup", "--output", str(script)).returncode, 0)
+        elsewhere = base / "ailleurs/project-chantier-p1"
+        elsewhere.mkdir(parents=True)
+        (elsewhere / "precieux.md").write_text("un autre dossier, du même nom\n", encoding="utf-8")
+        volume.rename(base / "volume-reel")
+        volume.symlink_to(base / "ailleurs", target_is_directory=True)
+        passing = base / "bin"
+        passing.mkdir()
+        (passing / "python3").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")  # the check passed, an instant ago
+        (passing / "python3").chmod(0o755)
+        environment = dict(os.environ, PATH=f"{passing}{os.pathsep}{os.environ.get('PATH', '')}")
+        ran = subprocess.run(["bash", str(script)], capture_output=True, text=True, check=False, env=environment)
+        self.assertNotEqual(ran.returncode, 0, ran.stdout)
+        self.assertIn("son dossier parent n'est plus celui qui a été contrôlé", ran.stderr)
+        self.assertTrue((elsewhere / "precieux.md").exists(), "the folder the link leads to is untouched")
+        self.assertTrue((base / "volume-reel/project-chantier-p1").is_dir())
+
+    def test_the_doctrine_and_the_command_guide_describe_the_copies(self) -> None:
+        core = (ROOT / "docs/agent-governance/AGENTS.core.md").read_text(encoding="utf-8")
+        guide = (ROOT / "project_control/README.md").read_text(encoding="utf-8")
+        for command in ("copy open", "copy return", "copy check", "copy move", "copy close", "copy cleanup"):
+            self.assertIn(command, guide)
+        for notion in ("tableau des clés", "fiche de sortie", "COPIES_RETURNED", "copy open"):
+            self.assertIn(notion, core)
+        # What the independent review of the construction closed is written where agents read it.
+        for notion in ("COPY_ORIGINAL", "COPY_COVERAGE", "unset PROJECT_CONTROL_PATH_MAP", "une branche ou un tag",
+                       "ne se lancent que dans l’original", "(`core.fsmonitor`) est coupée"):
+            self.assertIn(notion, guide)
+        flat_core, flat_guide = " ".join(core.split()), " ".join(guide.split())
+        for notion in ("une branche ou un tag", "les commandes `copy` n’y tournent pas", "prouve des octets, pas un sens",
+                       "un clone partiel est refusé avant toute lecture", "des deux côtés de ses entrées",
+                       "un clone sans fiche, qui hérite du registre, n’y écrit rien non plus"):
+            self.assertIn(notion, flat_core)
+        for notion in ("**cette révision elle-même** (`origin:<commit>`)", "JSON canonique",
+                       "n’importe où dans `.git`", "Un clone sans fiche de sortie hérite lui aussi du registre"):
+            self.assertIn(notion, flat_guide)
 
 
 if __name__ == "__main__":

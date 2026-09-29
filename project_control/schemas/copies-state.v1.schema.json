@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:governed-project:project-control:copies-state:v1",
+  "title": "Copies State v1",
+  "description": "The register of the copies made of this repository (P21, tableau des clés): the decision that opened each one, what will become of it, when it is due back, and the proof that what it held came back or was abandoned by name. Kept by `copy` commands only; absent means empty. A project keeps it in project_control/copies-state.v1.json, the template in provenance/copies-state.v1.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "updated_at", "copies"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "updated_at": {"type": "string", "minLength": 1},
+    "copies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "copy_id", "name", "path", "kind", "usage", "ticket", "closes_with", "origin", "fate",
+          "due", "opened_at", "token", "state", "returns", "content_digest", "moves", "closed_at",
+          "closing_decision"
+        ],
+        "properties": {
+          "copy_id": {"type": "string", "pattern": "^COPY-[0-9]{3,}$"},
+          "name": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "pattern": "^/"},
+          "kind": {"type": "string", "enum": ["CLONE", "EXPORT"]},
+          "usage": {"type": "string", "enum": ["chantier", "revue", "repetition"]},
+          "ticket": {"type": "string", "pattern": "^(HD-[0-9]{3,}|TPL-D-[0-9]{3,})$"},
+          "closes_with": {"type": "string", "pattern": "^(WI-[0-9]{3,}|[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "origin": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["original_path", "commit", "tag", "root_commit"],
+            "properties": {
+              "original_path": {"type": "string", "pattern": "^/"},
+              "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+              "tag": {"type": ["string", "null"]},
+              "root_commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"}
+            }
+          },
+          "fate": {"type": "string", "enum": ["RETURN_THEN_ERASE", "ERASE", "KEEP"]},
+          "due": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+          "opened_at": {"type": "string", "format": "date-time"},
+          "token": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "state": {"type": "string", "enum": ["OPEN", "RETURNED", "ERASED", "KEPT"]},
+          "returns": {"type": "array", "items": {"type": "object"}},
+          "content_digest": {"type": ["string", "null"]},
+          "moves": {"type": "array", "items": {"type": "object"}},
+          "closed_at": {"type": ["string", "null"]},
+          "closing_decision": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}
